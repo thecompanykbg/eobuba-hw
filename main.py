@@ -66,8 +66,6 @@ def update():
         print(f'{version} is latest version.')
         clear_display()
         display_string('Latest version.')
-        sleep(0.5)
-        init_display()
         return
     clear_display()
     display_string('Updating..')
