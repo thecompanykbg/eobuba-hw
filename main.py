@@ -12,6 +12,8 @@ from ili9341 import Display, color565
 from xglcd_font import XglcdFont
 from mlx90614 import MLX90614_I2C
 
+# from new_ili9341 import NewDisplay, color565
+
 
 ap_ssid = "Pico_Test"
 ap_password = "12341234"
@@ -48,27 +50,30 @@ display = Display(spi, dc=Pin(16), cs=Pin(18), rst=Pin(17), rotation=270)
 
 
 def update():
+    display_string(f'Update checking..')
+    f = None
     try:
-        response = requests.get('https://api.eobuba.co.kr/version')
         f = open('version.txt', 'r')
-        current_version = f.read()
+    except:
+        f = open('version.txt', 'w')
         f.close()
-        if current_version == response.json()['version']:
-            print('Latest version.')
-            return
-        response = requests.get('https://api.eobuba.co.kr/update')
-        file_names = resopnse.json()['file_names']
-        for file_name in file_names:
-            response = requests.get(f'https://api.eobuba.co.kr/update/{file_name}')
-            f = open(file_name, 'w')
-            print(file_name, 'writing...')
-            f.write(response.json()['content'])
-            f.close()
-            print(file_name, 'done')
-        print('Update complete.')
-    except Exception as e:
-        print(e)
-        print('Update is not supported.')
+        f = open('version.txt', 'r')
+    version = f.read()
+    response = requests.get('https://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
+    print(response.text, version)
+    if response.text == version:
+        print('Latest version.')
+        return
+    response = requests.get('https://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
+    file_names = response.text.split()
+    print(file_names)
+    for file_name in file_names:
+        response = requests.get(f'https://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/{file_name}')
+        f = open(file_name, 'w')
+        f.write(response.text)
+        f.close()
+    print('Update complete.')
+    display_string(f'Version {version} Update completed.')
 
 
 def zfill(string, char, count):
@@ -119,11 +124,17 @@ def web_done_page():
 
 def wifi_setting():
     global kindergarden_id, wifi_ssid, wifi_password
-        
-    f = open('wifi_data.txt', 'r')
+    f = None
+    try:
+        f = open('wifi_data.txt', 'r')
+    except:
+        f = open('wifi_data.txt', 'w')
+        f.close()
+        f = open('wifi_data.txt', 'r')
     print('file read...')
     data = f.read()
     f.close()
+        
     if data.find('$') >= 0:
         kindergarden_id, wifi_ssid, wifi_password = data.split('$')
     print(kindergarden_id, wifi_ssid, wifi_password)
@@ -252,8 +263,10 @@ async def get_temperature():
 
 
 def get_time():
+    # global year, month, day, week_day, hour, minute, second
     response = requests.get('http://worldtimeapi.org/api/timezone/Asia/Seoul')
     date = response.json()['datetime']
+    #week_day = response.json()['day_of_week']
     year, month, day = map(int, date[:10].split('-'))
     hour, minute, second = map(int, date[11:19].split(':'))
     rtc.datetime((year, month, day, 0, hour, minute, second, 0))
@@ -330,11 +343,13 @@ def tag():
 wifi_setting()
 wifi_connect()
 
+#sleep(2)
 update()
 
-get_time()
+#get_time()
 
-timer = Timer(mode=Timer.PERIODIC, period=1000, callback=datetime_handler)
+#timer = Timer(mode=Timer.PERIODIC, period=1000, callback=datetime_handler)
 
-init_display()
-tag()
+#init_display()
+#tag()
+
