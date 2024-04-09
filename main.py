@@ -34,7 +34,7 @@ beeper.deinit()
 DEBUG = True
 VOLUME = 10
 is_displaying = False
-sleep_limit = 5
+sleep_limit = 300
 sleep_time = 0
 is_sleeping = False
 
@@ -124,15 +124,17 @@ def datetime_handler(timer):
     print(year, month, day, week_day, hour, minute, second)
 
 
-def web_login_page():
+def web_login_page(network_list):
     html = """<html><head><meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1"></head>
               <body><h1>어부바 전자출결기기 Wi-fi 설정</h1>
               <form><label for="ssid">그룹 ID(GROUP_ID): <input id="groupId" name="groupId"><br></label>
-              <label for="ssid">와이파이 이름: <input id="ssid" name="ssid"><br></label>
-              <label for="password">와이파이 비밀번호: <input id="password" name="password" type="password"></label><br>
-              <input hidden name="end">
-              <input type="submit" value="확인"></form></body></html>
-           """
+              <label for="ssid">와이파이 이름: <select id="ssid" name="ssid">"""
+    html += ''.join([f'<option value="{network_name}">{network_name}</option>' for network_name in network_list])
+    html += """</select><br></label>
+               <label for="password">와이파이 비밀번호: <input id="password" name="password" type="password"></label><br>
+               <input hidden name="end">
+               <input type="submit" value="확인"></form></body></html>
+            """
     return html
 
 
@@ -178,6 +180,11 @@ def wifi_setting():
 
     print(ap.ifconfig())
 
+    wlan = network.WLAN(network.STA_IF)
+    network_list = []
+    for nw in wlan.scan():
+        network_list.append(bytes.decode(nw[0]))
+    
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind(('', 80))
@@ -186,7 +193,7 @@ def wifi_setting():
     while wifi_ssid == '':
         conn, addr = s.accept()
         req = str(conn.recv(1024))
-        response = web_login_page()
+        response = web_login_page(network_list)
         group_id_idx = req.find('/?groupId=')
         ssid_idx = req.find('&ssid=')
         password_idx = req.find('&password=')
@@ -229,6 +236,7 @@ def wifi_connect():
     print(wlan.isconnected())
     print(wlan.ifconfig())
     print(wlan.status())
+    sleep(0.5)
 
 
 def init_display():
@@ -314,14 +322,15 @@ def stop_display():
 def sleep_mode():
     global is_sleeping
     is_sleeping = True
-    display.display_off()
+    #display.display_off()
+    display.fill_rectangle(0, 0, 320, 240, color565(0, 0, 0))
 
 
 def awake_mode():
     global is_sleeping, sleep_time
     is_sleeping = False
     sleep_time = 0
-    display.display_on()
+    #display.display_on()
 
 
 def start_datetime_timer():
@@ -355,7 +364,6 @@ def tag():
         start_display()
         clear_display()
         nfc_id = ''.join([hex(i)[2:] for i in nfc_data])
-        beep()
         asyncio.run(beep())
         beeper.deinit()
         temp = asyncio.run(get_temperature())
@@ -366,7 +374,7 @@ def tag():
             display_string('wrong nfc')
         else:
             display_string(f'welcome, {response['seq_kids']}')
-        sleep(2)
+        #sleep(2)
         clear_display()
         init_display()
 
@@ -374,7 +382,6 @@ def tag():
 wifi_setting()
 wifi_connect()
 
-sleep(2)
 update()
 
 get_time()
