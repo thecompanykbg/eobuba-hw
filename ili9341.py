@@ -175,78 +175,6 @@ class Display(object):
     def display_on(self):
         self.write_cmd(self.DISPLAY_ON)
 
-    def draw_circle(self, x0, y0, r, color):
-        f = 1 - r
-        dx = 1
-        dy = -r - r
-        x = 0
-        y = r
-        self.draw_pixel(x0, y0 + r, color)
-        self.draw_pixel(x0, y0 - r, color)
-        self.draw_pixel(x0 + r, y0, color)
-        self.draw_pixel(x0 - r, y0, color)
-        while x < y:
-            if f >= 0:
-                y -= 1
-                dy += 2
-                f += dy
-            x += 1
-            dx += 2
-            f += dx
-            self.draw_pixel(x0 + x, y0 + y, color)
-            self.draw_pixel(x0 - x, y0 + y, color)
-            self.draw_pixel(x0 + x, y0 - y, color)
-            self.draw_pixel(x0 - x, y0 - y, color)
-            self.draw_pixel(x0 + y, y0 + x, color)
-            self.draw_pixel(x0 - y, y0 + x, color)
-            self.draw_pixel(x0 + y, y0 - x, color)
-            self.draw_pixel(x0 - y, y0 - x, color)
-
-    def draw_ellipse(self, x0, y0, a, b, color):
-        a2 = a * a
-        b2 = b * b
-        twoa2 = a2 + a2
-        twob2 = b2 + b2
-        x = 0
-        y = b
-        px = 0
-        py = twoa2 * y
-        # Plot initial points
-        self.draw_pixel(x0 + x, y0 + y, color)
-        self.draw_pixel(x0 - x, y0 + y, color)
-        self.draw_pixel(x0 + x, y0 - y, color)
-        self.draw_pixel(x0 - x, y0 - y, color)
-        # Region 1
-        p = round(b2 - (a2 * b) + (0.25 * a2))
-        while px < py:
-            x += 1
-            px += twob2
-            if p < 0:
-                p += b2 + px
-            else:
-                y -= 1
-                py -= twoa2
-                p += b2 + px - py
-            self.draw_pixel(x0 + x, y0 + y, color)
-            self.draw_pixel(x0 - x, y0 + y, color)
-            self.draw_pixel(x0 + x, y0 - y, color)
-            self.draw_pixel(x0 - x, y0 - y, color)
-        # Region 2
-        p = round(b2 * (x + 0.5) * (x + 0.5) +
-                  a2 * (y - 1) * (y - 1) - a2 * b2)
-        while y > 0:
-            y -= 1
-            py -= twoa2
-            if p > 0:
-                p += a2 - py
-            else:
-                x += 1
-                px += twob2
-                p += a2 - py + px
-            self.draw_pixel(x0 + x, y0 + y, color)
-            self.draw_pixel(x0 - x, y0 + y, color)
-            self.draw_pixel(x0 + x, y0 - y, color)
-            self.draw_pixel(x0 - x, y0 - y, color)
 
     def draw_hline(self, x, y, w, color):
         if self.is_off_grid(x, y, x + w - 1, y):
@@ -313,78 +241,12 @@ class Display(object):
                        buf)
         return w, h
 
-    def draw_line(self, x1, y1, x2, y2, color):
-        # Check for horizontal line
-        if y1 == y2:
-            if x1 > x2:
-                x1, x2 = x2, x1
-            self.draw_hline(x1, y1, x2 - x1 + 1, color)
-            return
-        # Check for vertical line
-        if x1 == x2:
-            if y1 > y2:
-                y1, y2 = y2, y1
-            self.draw_vline(x1, y1, y2 - y1 + 1, color)
-            return
-        # Confirm coordinates in boundary
-        if self.is_off_grid(min(x1, x2), min(y1, y2),
-                            max(x1, x2), max(y1, y2)):
-            return
-        # Changes in x, y
-        dx = x2 - x1
-        dy = y2 - y1
-        # Determine how steep the line is
-        is_steep = abs(dy) > abs(dx)
-        # Rotate line
-        if is_steep:
-            x1, y1 = y1, x1
-            x2, y2 = y2, x2
-        # Swap start and end points if necessary
-        if x1 > x2:
-            x1, x2 = x2, x1
-            y1, y2 = y2, y1
-        # Recalculate differentials
-        dx = x2 - x1
-        dy = y2 - y1
-        # Calculate error
-        error = dx >> 1
-        ystep = 1 if y1 < y2 else -1
-        y = y1
-        for x in range(x1, x2 + 1):
-            # Had to reverse HW ????
-            if not is_steep:
-                self.draw_pixel(x, y, color)
-            else:
-                self.draw_pixel(y, x, color)
-            error -= abs(dy)
-            if error < 0:
-                y += ystep
-                error += dx
-
-    def draw_lines(self, coords, color):
-        # Starting point
-        x1, y1 = coords[0]
-        # Iterate through coordinates
-        for i in range(1, len(coords)):
-            x2, y2 = coords[i]
-            self.draw_line(x1, y1, x2, y2, color)
-            x1, y1 = x2, y2
 
     def draw_pixel(self, x, y, color):
         if self.is_off_grid(x, y, x, y):
             return
         self.block(x, y, x, y, color.to_bytes(2, 'big'))
 
-    def draw_polygon(self, sides, x0, y0, r, color, rotate=0):
-        coords = []
-        theta = radians(rotate)
-        n = sides + 1
-        for s in range(n):
-            t = 2.0 * pi * s / sides + theta
-            coords.append([int(r * cos(t) + x0), int(r * sin(t) + y0)])
-
-        # Cast to python float first to fix rounding errors
-        self.draw_lines(coords, color=color)
 
     def draw_rectangle(self, x, y, w, h, color):
         x2 = x + w - 1
@@ -393,13 +255,6 @@ class Display(object):
         self.draw_hline(x, y2, w, color)
         self.draw_vline(x, y, h, color)
         self.draw_vline(x2, y, h, color)
-
-    def draw_sprite(self, buf, x, y, w, h):
-        x2 = x + w - 1
-        y2 = y + h - 1
-        if self.is_off_grid(x, y, x2, y2):
-            return
-        self.block(x, y, x2, y2, buf)
 
     def draw_text(self, x, y, text, font, color,  background=0,
                   landscape=False, rotate_180=False, spacing=1):
@@ -432,117 +287,12 @@ class Display(object):
                 # # Position x for next letter
                 # x += w + spacing
 
-    def draw_text8x8(self, x, y, text, color,  background=0,
-                     rotate=0):
-        w = len(text) * 8
-        h = 8
-        # Confirm coordinates in boundary
-        if self.is_off_grid(x, y, x + 7, y + 7):
-            return
-        # Rearrange color
-        r = (color & 0xF800) >> 8
-        g = (color & 0x07E0) >> 3
-        b = (color & 0x1F) << 3
-        buf = bytearray(w * 16)
-        fbuf = FrameBuffer(buf, w, h, RGB565)
-        if background != 0:
-            bg_r = (background & 0xF800) >> 8
-            bg_g = (background & 0x07E0) >> 3
-            bg_b = (background & 0x1F) << 3
-            fbuf.fill(color565(bg_b, bg_r, bg_g))
-        fbuf.text(text, 0, 0, color565(b, r, g))
-        if rotate == 0:
-            self.block(x, y, x + w - 1, y + (h - 1), buf)
-        elif rotate == 90:
-            buf2 = bytearray(w * 16)
-            fbuf2 = FrameBuffer(buf2, h, w, RGB565)
-            for y1 in range(h):
-                for x1 in range(w):
-                    fbuf2.pixel(y1, x1,
-                                fbuf.pixel(x1, (h - 1) - y1))
-            self.block(x, y, x + (h - 1), y + w - 1, buf2)
-        elif rotate == 180:
-            buf2 = bytearray(w * 16)
-            fbuf2 = FrameBuffer(buf2, w, h, RGB565)
-            for y1 in range(h):
-                for x1 in range(w):
-                    fbuf2.pixel(x1, y1,
-                                fbuf.pixel((w - 1) - x1, (h - 1) - y1))
-            self.block(x, y, x + w - 1, y + (h - 1), buf2)
-        elif rotate == 270:
-            buf2 = bytearray(w * 16)
-            fbuf2 = FrameBuffer(buf2, h, w, RGB565)
-            for y1 in range(h):
-                for x1 in range(w):
-                    fbuf2.pixel(y1, x1,
-                                fbuf.pixel((w - 1) - x1, y1))
-            self.block(x, y, x + (h - 1), y + w - 1, buf2)
-
     def draw_vline(self, x, y, h, color):
         # Confirm coordinates in boundary
         if self.is_off_grid(x, y, x, y + h - 1):
             return
         line = color.to_bytes(2, 'big') * h
         self.block(x, y, x, y + h - 1, line)
-
-    def fill_circle(self, x0, y0, r, color):
-        f = 1 - r
-        dx = 1
-        dy = -r - r
-        x = 0
-        y = r
-        self.draw_vline(x0, y0 - r, 2 * r + 1, color)
-        while x < y:
-            if f >= 0:
-                y -= 1
-                dy += 2
-                f += dy
-            x += 1
-            dx += 2
-            f += dx
-            self.draw_vline(x0 + x, y0 - y, 2 * y + 1, color)
-            self.draw_vline(x0 - x, y0 - y, 2 * y + 1, color)
-            self.draw_vline(x0 - y, y0 - x, 2 * x + 1, color)
-            self.draw_vline(x0 + y, y0 - x, 2 * x + 1, color)
-
-    def fill_ellipse(self, x0, y0, a, b, color):
-        a2 = a * a
-        b2 = b * b
-        twoa2 = a2 + a2
-        twob2 = b2 + b2
-        x = 0
-        y = b
-        px = 0
-        py = twoa2 * y
-        # Plot initial points
-        self.draw_line(x0, y0 - y, x0, y0 + y, color)
-        # Region 1
-        p = round(b2 - (a2 * b) + (0.25 * a2))
-        while px < py:
-            x += 1
-            px += twob2
-            if p < 0:
-                p += b2 + px
-            else:
-                y -= 1
-                py -= twoa2
-                p += b2 + px - py
-            self.draw_line(x0 + x, y0 - y, x0 + x, y0 + y, color)
-            self.draw_line(x0 - x, y0 - y, x0 - x, y0 + y, color)
-        # Region 2
-        p = round(b2 * (x + 0.5) * (x + 0.5) +
-                  a2 * (y - 1) * (y - 1) - a2 * b2)
-        while y > 0:
-            y -= 1
-            py -= twoa2
-            if p > 0:
-                p += a2 - py
-            else:
-                x += 1
-                px += twob2
-                p += a2 - py + px
-            self.draw_line(x0 + x, y0 - y, x0 + x, y0 + y, color)
-            self.draw_line(x0 - x, y0 - y, x0 - x, y0 + y, color)
 
     def fill_hrect(self, x, y, w, h, color):
         if self.is_off_grid(x, y, x + w - 1, y + h - 1):
@@ -573,74 +323,6 @@ class Display(object):
         else:
             self.fill_vrect(x, y, w, h, color)
 
-    def fill_polygon(self, sides, x0, y0, r, color, rotate=0):
-        # Determine side coordinates
-        coords = []
-        theta = radians(rotate)
-        n = sides + 1
-        for s in range(n):
-            t = 2.0 * pi * s / sides + theta
-            coords.append([int(r * cos(t) + x0), int(r * sin(t) + y0)])
-        # Starting point
-        x1, y1 = coords[0]
-        # Minimum Maximum X dict
-        xdict = {y1: [x1, x1]}
-        # Iterate through coordinates
-        for row in coords[1:]:
-            x2, y2 = row
-            xprev, yprev = x2, y2
-            # Calculate perimeter
-            # Check for horizontal side
-            if y1 == y2:
-                if x1 > x2:
-                    x1, x2 = x2, x1
-                if y1 in xdict:
-                    xdict[y1] = [min(x1, xdict[y1][0]), max(x2, xdict[y1][1])]
-                else:
-                    xdict[y1] = [x1, x2]
-                x1, y1 = xprev, yprev
-                continue
-            # Non horizontal side
-            # Changes in x, y
-            dx = x2 - x1
-            dy = y2 - y1
-            # Determine how steep the line is
-            is_steep = abs(dy) > abs(dx)
-            # Rotate line
-            if is_steep:
-                x1, y1 = y1, x1
-                x2, y2 = y2, x2
-            # Swap start and end points if necessary
-            if x1 > x2:
-                x1, x2 = x2, x1
-                y1, y2 = y2, y1
-            # Recalculate differentials
-            dx = x2 - x1
-            dy = y2 - y1
-            # Calculate error
-            error = dx >> 1
-            ystep = 1 if y1 < y2 else -1
-            y = y1
-            # Calcualte minimum and maximum x values
-            for x in range(x1, x2 + 1):
-                if is_steep:
-                    if x in xdict:
-                        xdict[x] = [min(y, xdict[x][0]), max(y, xdict[x][1])]
-                    else:
-                        xdict[x] = [y, y]
-                else:
-                    if y in xdict:
-                        xdict[y] = [min(x, xdict[y][0]), max(x, xdict[y][1])]
-                    else:
-                        xdict[y] = [x, x]
-                error -= abs(dy)
-                if error < 0:
-                    y += ystep
-                    error += dx
-            x1, y1 = xprev, yprev
-        # Fill polygon
-        for y, x in xdict.items():
-            self.draw_hline(x[0], y, x[1] - x[0] + 2, color)
 
     def fill_vrect(self, x, y, w, h, color):
         if self.is_off_grid(x, y, x + w - 1, y + h - 1):
@@ -670,28 +352,7 @@ class Display(object):
             self.write_cmd(self.INVOFF)
 
     def is_off_grid(self, xmin, ymin, xmax, ymax):
-        """
-        if xmin < 0:
-            print('x-coordinate: {0} below minimum of 0.'.format(xmin))
-            return True
-        if ymin < 0:
-            print('y-coordinate: {0} below minimum of 0.'.format(ymin))
-            return True
-        if xmax >= self.width:
-            print('x-coordinate: {0} above maximum of {1}.'.format(
-                xmax, self.width - 1))
-            return True
-        if ymax >= self.height:
-            print('y-coordinate: {0} above maximum of {1}.'.format(
-                ymax, self.height - 1))
-            return True
-        """
         return False
-
-    def load_sprite(self, path, w, h):
-        buf_size = w * h * 2
-        with open(path, "rb") as f:
-            return f.read(buf_size)
 
     def reset_cpy(self):
         self.rst.value = False
