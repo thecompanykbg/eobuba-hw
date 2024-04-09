@@ -12,8 +12,6 @@ from ili9341 import Display, color565
 from xglcd_font import XglcdFont
 from mlx90614 import MLX90614_I2C
 
-# from new_ili9341 import NewDisplay, color565
-
 
 ap_ssid = "Pico_Test"
 ap_password = "12341234"
@@ -41,7 +39,6 @@ sleep_limit = 5
 sleep_time = 0
 is_sleeping = False
 
-
 # Baud rate of 40000000 seems about the max
 spi = SPI(1, baudrate=40000000, sck=Pin(10), mosi=Pin(11))
 
@@ -50,6 +47,7 @@ display = Display(spi, dc=Pin(16), cs=Pin(18), rst=Pin(17), rotation=270)
 
 
 def update():
+    clear_display()
     display_string(f'Update checking..')
     f = None
     try:
@@ -63,6 +61,8 @@ def update():
     print(response.text, version)
     if response.text == version:
         print('Latest version.')
+        clear_display()
+        display_string(f'Latest version.')
         return
     response = requests.get('https://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
     file_names = response.text.split()
@@ -73,7 +73,11 @@ def update():
         f.write(response.text)
         f.close()
     print('Update complete.')
+    clear_display()
     display_string(f'Version {version} Update completed.')
+    sleep(1)
+    clear_display()
+    display_string(f'Please restart.')
 
 
 def zfill(string, char, count):
@@ -343,13 +347,13 @@ def tag():
 wifi_setting()
 wifi_connect()
 
-#sleep(2)
+sleep(2)
 update()
 
-#get_time()
+get_time()
 
-#timer = Timer(mode=Timer.PERIODIC, period=1000, callback=datetime_handler)
+timer = Timer(mode=Timer.PERIODIC, period=1000, callback=datetime_handler)
 
-#init_display()
-#tag()
+init_display()
+tag()
 
