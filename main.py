@@ -298,6 +298,7 @@ def get_time():
     year, month, day = map(int, date[:10].split('-'))
     hour, minute, second = map(int, date[11:19].split(':'))
     rtc.datetime((year, month, day, 0, hour, minute, second, 0))
+    sleep(2)
 
 
 async def post_nfc(nfc_id):
