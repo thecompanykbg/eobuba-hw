@@ -61,8 +61,9 @@ def update():
     version = f.read()
     response = requests.get('https://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
     print(response.text, version)
-    if response.text == version:
-        print('Latest version.')
+    new_version = response.text
+    if new_version == version:
+        print(f'{version} is latest version.')
         clear_display()
         display_string('Latest version.')
         sleep(0.5)
@@ -80,7 +81,7 @@ def update():
         f.close()
     print('Update complete.')
     clear_display()
-    display_string(f'Version {version} Update completed.')
+    display_string(f'{new_version} update completed.')
     sleep(1)
     clear_display()
     display_string(f'Please restart.')
@@ -374,7 +375,6 @@ def tag():
             display_string('wrong nfc')
         else:
             display_string(f'welcome, {response['seq_kids']}')
-        #sleep(2)
         clear_display()
         init_display()
 
