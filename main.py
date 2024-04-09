@@ -78,6 +78,8 @@ def update():
     sleep(1)
     clear_display()
     display_string(f'Please restart.')
+    while True:
+        pass
 
 
 def zfill(string, char, count):
@@ -356,4 +358,3 @@ timer = Timer(mode=Timer.PERIODIC, period=1000, callback=datetime_handler)
 
 init_display()
 tag()
-
