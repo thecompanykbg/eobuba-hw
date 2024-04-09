@@ -32,7 +32,7 @@ beeper = PWM(26)
 beeper.deinit()
 
 DEBUG = True
-VOLUME = 100
+VOLUME = 10
 is_displaying = False
 sleep_limit = 5
 sleep_time = 0
@@ -43,6 +43,9 @@ spi = SPI(1, baudrate=40000000, sck=Pin(10), mosi=Pin(11))
 
 unispace = XglcdFont('fonts/Unispace12x24.c', 12, 24)
 display = Display(spi, dc=Pin(16), cs=Pin(18), rst=Pin(17), rotation=270)
+
+datetime_timer = Timer()
+update_timer = Timer()
 
 
 def update():
@@ -61,10 +64,12 @@ def update():
     if response.text == version:
         print('Latest version.')
         clear_display()
-        display_string(f'Latest version.')
+        display_string('Latest version.')
         sleep(0.5)
         init_display()
         return
+    clear_display()
+    display_string('Updating..')
     response = requests.get('https://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
     file_names = response.text.split()
     print(file_names)
@@ -84,8 +89,12 @@ def update():
 
 
 def update_handler(timer):
+    awake_mode()
+    stop_datetime_timer()
     start_display()
     update()
+    awake_mode()
+    start_datetime_timer()
 
 
 def zfill(string, char, count):
@@ -315,6 +324,18 @@ def awake_mode():
     display.display_on()
 
 
+def start_datetime_timer():
+    datetime_timer.init(mode=Timer.PERIODIC, period=1000, callback=datetime_handler)
+
+
+def stop_datetime_timer():
+    datetime_timer.deinit()
+
+
+def start_update_timer():
+    update_timer.init(mode=Timer.PERIODIC, period=21600000, callback=update_handler)
+
+
 def tag():
     nfc.SAM_configuration()
 
@@ -358,8 +379,8 @@ update()
 
 get_time()
 
-Timer(mode=Timer.PERIODIC, period=1000, callback=datetime_handler)
-Timer(mode=Timer.PERIODIC, period=21600000, callback=update_handler)
+start_datetime_timer()
+start_update_timer()
 
 init_display()
 tag()
