@@ -20,7 +20,6 @@ kindergarden_id = wifi_ssid = wifi_password = ''
 
 rtc = RTC()
 
-year = month = day = week_day = hour = minute = second = 0
 week_day_str = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 nfc = PN532Uart(1, tx=Pin(4), rx=Pin(5), debug=False)
@@ -63,6 +62,8 @@ def update():
         print('Latest version.')
         clear_display()
         display_string(f'Latest version.')
+        sleep(0.5)
+        init_display()
         return
     response = requests.get('https://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
     file_names = response.text.split()
@@ -82,12 +83,17 @@ def update():
         pass
 
 
+def update_handler(timer):
+    start_display()
+    update()
+
+
 def zfill(string, char, count):
     return (char*count+string)[-count:]
 
 
 def datetime_handler(timer):
-    global year, month, day, week_day, hour, minute, second, sleep_time
+    global sleep_time
     year, month, day, week_day, hour, minute, second = rtc.datetime()[:7]
     if not is_displaying and sleep_time < sleep_limit:
         sleep_time += 1
@@ -269,10 +275,8 @@ async def get_temperature():
 
 
 def get_time():
-    # global year, month, day, week_day, hour, minute, second
     response = requests.get('http://worldtimeapi.org/api/timezone/Asia/Seoul')
     date = response.json()['datetime']
-    #week_day = response.json()['day_of_week']
     year, month, day = map(int, date[:10].split('-'))
     hour, minute, second = map(int, date[11:19].split(':'))
     rtc.datetime((year, month, day, 0, hour, minute, second, 0))
@@ -354,7 +358,8 @@ update()
 
 get_time()
 
-timer = Timer(mode=Timer.PERIODIC, period=1000, callback=datetime_handler)
+Timer(mode=Timer.PERIODIC, period=1000, callback=datetime_handler)
+Timer(mode=Timer.PERIODIC, period=21600000, callback=update_handler)
 
 init_display()
 tag()

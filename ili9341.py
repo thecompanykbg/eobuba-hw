@@ -159,8 +159,7 @@ class Display(object):
     def clear(self, color=0, hlines=8):
         w = self.width
         h = self.height
-        assert hlines > 0 and h % hlines == 0, (
-            "hlines must be a non-zero factor of height.")
+        assert hlines > 0 and h % hlines == 0, ("hlines must be a non-zero factor of height.")
         # Clear display
         if color:
             line = color.to_bytes(2, 'big') * (w * hlines)
@@ -174,7 +173,6 @@ class Display(object):
 
     def display_on(self):
         self.write_cmd(self.DISPLAY_ON)
-
 
     def draw_hline(self, x, y, w, color):
         if self.is_off_grid(x, y, x + w - 1, y):
