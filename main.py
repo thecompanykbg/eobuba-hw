@@ -1,6 +1,6 @@
 from time import sleep
 import asyncio
-from machine import I2C, Pin, SoftI2C, SPI, PWM, Timer, RTC
+from machine import I2C, Pin, SoftI2C, SPI, PWM, Timer, RTC, UART
 
 import network
 import socket
@@ -8,8 +8,6 @@ import requests
 import json
 
 from pn532 import PN532Uart
-from ili9341 import Display, color565
-from xglcd_font import XglcdFont
 from mlx90614 import MLX90614_I2C
 
 
@@ -20,7 +18,7 @@ kindergarden_id = wifi_ssid = wifi_password = ''
 
 rtc = RTC()
 
-week_day_str = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+week_days = ['월', '화', '수', '목', '금', '토', '일']
 
 nfc = PN532Uart(1, tx=Pin(4), rx=Pin(5), debug=False)
 nfc.SAM_configuration()
@@ -38,19 +36,68 @@ sleep_limit = 300
 sleep_time = 0
 is_sleeping = False
 
-# Baud rate of 40000000 seems about the max
-spi = SPI(1, baudrate=40000000, sck=Pin(10), mosi=Pin(11))
-
-unispace = XglcdFont('fonts/Unispace12x24.c', 12, 24)
-display = Display(spi, dc=Pin(16), cs=Pin(18), rst=Pin(17), rotation=270)
+hexadecimal = b'\xFF\xFF\xFF'
+display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=9600)
 
 datetime_timer = Timer()
 update_timer = Timer()
+read_timer = Timer()
+
+
+def display_send(command):
+    display.write(command)
+    display.write(hexadecimal)
+    sleep(0.05)
+    response = display.read()
+    return response
+
+
+def display_message(msg):
+    display_send(f'message.msg.txt="{msg}"')
+
+
+def display_page(page):
+    display_send(f'page {page}')
+
+
+def display_date(year, month, day, hour, minute, second, wd_idx):
+    yy = zfill(f'{year}', '0', 4)
+    MM = zfill(f'{month}', '0', 2)
+    dd = zfill(f'{day}', '0', 2)
+    hh = zfill(f'{hour}', '0', 2)
+    mm = zfill(f'{minute}', '0', 2)
+    ss = zfill(f'{second}', '0', 2)
+    wd = week_days[wd_idx]
+    display_send(f'date.txt="{yy}년 {MM}월 {dd}일({wd})"')
+    display_send(f'hour.txt="{hh}"')
+    display_send(f'minute.txt="{mm}"')
+    if second%2:
+        display_send('colon.txt=""')
+    else:
+        display_send('colon.txt=":"')
+
+
+def display_nfc(response, temperature):
+    result_code = response['resultCode']
+    if result_code < 0:
+        display_page('message')
+        display_message('등록되지 않은 NFC입니다')
+    else:
+        name, *_ = response['resultMsg'].split()
+        display_page('nfc_tag')
+        display_send(f'name.txt="{name}"')
+        display_send(f'temp.txt="{temperature}"')
+        if result_code >= 3:
+            display_send('state.txt="하원"')
+        else:
+            display_send('state.txt="등원"')
+    sleep(1)
+    display_page('clock')
 
 
 def update():
-    clear_display()
-    display_string(f'Update checking..')
+    display_page('message')
+    display_message('업데이트 확인 중..')
     f = None
     try:
         f = open('version.txt', 'r')
@@ -64,11 +111,11 @@ def update():
     new_version = response.text
     if new_version == version:
         print(f'{version} is latest version.')
-        clear_display()
-        display_string('Latest version.')
+        display_message(f'현재 최신 버전입니다')
+        sleep(1)
         return
-    clear_display()
-    display_string('Updating..')
+    
+    display_message(f'업데이트 중..')
     response = requests.get('https://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
     file_names = response.text.split()
     print(file_names)
@@ -78,22 +125,36 @@ def update():
         f.write(response.text)
         f.close()
     print('Update complete.')
-    clear_display()
-    display_string(f'{new_version} update completed.')
+    display_message(f'{new_version} 업데이트 완료')
     sleep(1)
-    clear_display()
-    display_string(f'Please restart.')
+    display_message('전원을 다시 켜주세요.')
     while True:
         pass
 
 
 def update_handler(timer):
-    awake_mode()
-    stop_datetime_timer()
-    start_display()
     update()
-    awake_mode()
-    start_datetime_timer()
+    display_page('clock')
+
+
+def read_handler(timer):
+    data = display.read()
+    if data is None:
+        return
+    if data == b'e\x00\x06\x01\xff\xff\xff\x04\xff\xff\xff':
+        print('settings')
+        display_page('settings')
+    elif data == b'e\x03\x03\x01\xff\xff\xff\x04\xff\xff\xff':
+        print('wifi')
+        wifi_setting()
+        display_page('clock')
+    elif data == b'e\x03\x04\x01\xff\xff\xff\x04\xff\xff\xff':
+        print('update')
+        update()
+        display_page('clock')
+    elif data == b'e\x03\x02\x01\xff\xff\xff\x04\xff\xff\xff':
+        print('back')
+        display_page('clock')
 
 
 def zfill(string, char, count):
@@ -102,25 +163,14 @@ def zfill(string, char, count):
 
 def datetime_handler(timer):
     global sleep_time
-    year, month, day, week_day, hour, minute, second = rtc.datetime()[:7]
+    year, month, day, wd_idx, hour, minute, second = rtc.datetime()[:7]
     if not is_displaying and sleep_time < sleep_limit:
         sleep_time += 1
-        print(sleep_time)
     if not is_sleeping and sleep_time >= sleep_limit:
         sleep_mode()
     if is_displaying or is_sleeping:
         return
-    yy = zfill(f'{year}', '0', 4)
-    MM = zfill(f'{month}', '0', 2)
-    dd = zfill(f'{day}', '0', 2)
-    hh = zfill(f'{hour}', '0', 2)
-    mm = zfill(f'{minute}', '0', 2)
-    wd = week_day_str[week_day]
-    if second%2:
-        display_string(f'{yy}.{MM}.{dd} {hh} {mm} ({wd})')
-    else:
-        display_string(f'{yy}.{MM}.{dd} {hh}:{mm} ({wd})')
-    print(year, month, day, week_day, hour, minute, second)
+    display_date(year, month, day, hour, minute, second, wd_idx)
 
 
 def web_login_page(network_list):
@@ -164,8 +214,8 @@ def wifi_setting():
     if wifi_ssid != '':
         return
     
-    clear_display()
-    display_string('Please set your Wi-fi.')
+    display_page('message')
+    display_message('와이파이를 설정해 주세요')
     
     ap = network.WLAN(network.AP_IF)
     ap.active(False)
@@ -221,39 +271,20 @@ def wifi_connect():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     
-    clear_display()
-    display_string('Wi-fi connecting..')
+    display_page('message')
+    display_message('와이파이 연결 중..')
 
     wlan.connect(wifi_ssid, wifi_password)
     while wlan.isconnected() == False:
         print('Wi-fi connecting..')
         sleep(3)
     
-    clear_display()
-    display_string('Wi-fi is connected.')
-
+    display_message('와이파이 연결 완료')
+    
     print(wlan.isconnected())
     print(wlan.ifconfig())
     print(wlan.status())
     sleep(0.5)
-
-
-def init_display():
-    stop_display()
-    datetime_handler(None)
-
-
-def clear_display():
-    display.fill_rectangle(0, 0, 320, 240, color565(0, 0, 0))
-
-
-def display_temperature(temp):
-    print(temp)
-    display.draw_text(0, 70, f'temperature: {temp}', unispace, color565(255, 128, 0))
-
-
-def display_string(string):
-    display.draw_text(0, 100, f'{string}', unispace, color565(255, 128, 0))
 
 
 async def beep():
@@ -322,15 +353,14 @@ def stop_display():
 def sleep_mode():
     global is_sleeping
     is_sleeping = True
-    #display.display_off()
-    display.fill_rectangle(0, 0, 320, 240, color565(0, 0, 0))
+    display_send('sleep=1')
 
 
 def awake_mode():
     global is_sleeping, sleep_time
     is_sleeping = False
     sleep_time = 0
-    #display.display_on()
+    display_send('sleep=0')
 
 
 def start_datetime_timer():
@@ -343,6 +373,10 @@ def stop_datetime_timer():
 
 def start_update_timer():
     update_timer.init(mode=Timer.PERIODIC, period=21600000, callback=update_handler)
+
+
+def start_read_timer():
+    read_timer.init(mode=Timer.PERIODIC, period=100, callback=read_handler)
 
 
 def tag():
@@ -361,32 +395,28 @@ def tag():
         print(nfc_data)
         if is_sleeping:
             awake_mode()
-        start_display()
-        clear_display()
+        display_page('message')
+        display_message('정보 확인 중..')
         nfc_id = ''.join([hex(i)[2:] for i in nfc_data])
         asyncio.run(beep())
         beeper.deinit()
-        temp = asyncio.run(get_temperature())
-        print('temp', temp)
-        display_temperature(temp)
+        temperature = asyncio.run(get_temperature())
         response = asyncio.run(post_nfc(nfc_id))
-        if response['resultCode'] < 0:
-            display_string('wrong nfc')
-        else:
-            display_string(f'welcome, {response['seq_kids']}')
-        clear_display()
-        init_display()
+        display_nfc(response, temperature)
 
+
+awake_mode()
 
 wifi_setting()
 wifi_connect()
-
-update()
 
 get_time()
 
 start_datetime_timer()
 start_update_timer()
+start_read_timer()
 
-init_display()
+update()
+
+display_page('clock')
 tag()
