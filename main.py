@@ -11,7 +11,7 @@ from pn532 import PN532Uart
 from mlx90614 import MLX90614_I2C
 
 
-ap_ssid = "Pico_Test"
+ap_ssid = "Eobuba NFC"
 ap_password = "12341234"
 
 kindergarden_id = wifi_ssid = wifi_password = ''
@@ -36,8 +36,11 @@ sleep_limit = 300
 sleep_time = 0
 is_sleeping = False
 
+wlan = network.WLAN(network.STA_IF)
+ap = network.WLAN(network.AP_IF)
+
 hexadecimal = b'\xFF\xFF\xFF'
-display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=9600)
+display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=115200)
 
 datetime_timer = Timer()
 update_timer = Timer()
@@ -144,17 +147,16 @@ def read_handler(timer):
     if data == b'e\x00\x06\x01\xff\xff\xff\x04\xff\xff\xff':
         print('settings')
         display_page('settings')
+        return
     elif data == b'e\x03\x03\x01\xff\xff\xff\x04\xff\xff\xff':
         print('wifi')
-        wifi_setting()
-        display_page('clock')
+        wifi_init(is_init=False)
     elif data == b'e\x03\x04\x01\xff\xff\xff\x04\xff\xff\xff':
         print('update')
         update()
-        display_page('clock')
     elif data == b'e\x03\x02\x01\xff\xff\xff\x04\xff\xff\xff':
         print('back')
-        display_page('clock')
+    display_page('clock')
 
 
 def zfill(string, char, count):
@@ -194,8 +196,14 @@ def web_done_page():
     return html
 
 
-def wifi_setting():
+def wifi_setting(is_wrong):
     global kindergarden_id, wifi_ssid, wifi_password
+    
+    wlan.disconnect()
+    sleep(0.5)
+    ap.disconnect()
+    sleep(0.5)
+    
     f = None
     try:
         f = open('wifi_data.txt', 'r')
@@ -214,25 +222,27 @@ def wifi_setting():
     if wifi_ssid != '':
         return
     
-    display_page('message')
-    display_message('와이파이를 설정해 주세요')
+    print('wifi setting..')
     
-    ap = network.WLAN(network.AP_IF)
-    ap.active(False)
+    display_page('message')
+    if is_wrong:
+        display_message('와이파이를 확인하세요')
+    else:
+        display_message('와이파이를 설정하세요')
+    
 
     ap.config(essid=ap_ssid, password=ap_password)
     ap.ifconfig(('192.168.4.1', '255.255.255.0', '192.168.4.1', '0.0.0.0'))
 
     ap.active(True)
-    while ap.active == False:
-        pass
 
     print(ap.ifconfig())
 
-    wlan = network.WLAN(network.STA_IF)
     network_list = []
     for nw in wlan.scan():
         network_list.append(bytes.decode(nw[0]))
+    wlan.disconnect()
+    sleep(0.5)
     
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -255,6 +265,9 @@ def wifi_setting():
             response = web_done_page()
         conn.send(response)
         conn.close()
+    s.close()
+    ap.disconnect()
+    sleep(0.5)
     
     f = open('wifi_data.txt', 'w')
     print('writing...')
@@ -267,23 +280,57 @@ def wifi_setting():
     print('done')
 
 
+def wifi_reset():
+    global kindergarden_id, wifi_ssid, wifi_password
+    
+    kindergarden_id = wifi_ssid = wifi_password = ''
+    
+    wlan.disconnect()
+    sleep(0.5)
+    ap.disconnect()
+    sleep(0.5)
+    
+    f = open('wifi_data.txt', 'w')
+    print('Wi-fi init...')
+    f.write('')
+    f.close()
+    print('done')
+
+
 def wifi_connect():
-    wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
     
     display_page('message')
     display_message('와이파이 연결 중..')
 
     wlan.connect(wifi_ssid, wifi_password)
+    count = 0
     while wlan.isconnected() == False:
+        if count >= 5:
+            print('Wi-fi connect fail')
+            return False
         print('Wi-fi connecting..')
+        count += 1
         sleep(3)
     
     display_message('와이파이 연결 완료')
+    print('Wi-fi connect success')
     
     print(wlan.isconnected())
     print(wlan.ifconfig())
     print(wlan.status())
+    sleep(0.5)
+    return True
+
+
+def wifi_init(is_init):
+    if not is_init:
+        wifi_reset()
+    wifi_setting(is_wrong=False)
+    while not wifi_connect():
+        wifi_reset()
+        wifi_setting(is_wrong=True)
+    ap.disconnect()
     sleep(0.5)
 
 
@@ -407,8 +454,7 @@ def tag():
 
 awake_mode()
 
-wifi_setting()
-wifi_connect()
+wifi_init(is_init=True)
 
 get_time()
 
