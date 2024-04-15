@@ -30,7 +30,7 @@ beeper = PWM(26)
 beeper.deinit()
 
 DEBUG = True
-VOLUME = 10
+VOLUME = 20
 is_displaying = False
 sleep_limit = 300
 sleep_time = 0
@@ -109,9 +109,10 @@ def update():
         f.close()
         f = open('version.txt', 'r')
     version = f.read()
-    response = requests.get('https://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
+    response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
     print(response.text, version)
     new_version = response.text
+    response.close()
     if new_version == version:
         print(f'{version} is latest version.')
         display_message(f'현재 최신 버전입니다')
@@ -119,13 +120,15 @@ def update():
         return
     
     display_message(f'업데이트 중..')
-    response = requests.get('https://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
+    response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
     file_names = response.text.split()
+    response.close()
     print(file_names)
     for file_name in file_names:
-        response = requests.get(f'https://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/{file_name}')
+        response = requests.get(f'http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/{file_name}')
         f = open(file_name, 'w')
         f.write(response.text)
+        response.close()
         f.close()
     print('Update complete.')
     display_message(f'{new_version} 업데이트 완료')
@@ -334,38 +337,22 @@ def wifi_init(is_init):
     sleep(0.5)
 
 
-async def beep():
-    tempo = 1
-    tones = {
-        'c': 262,
-        'd': 294,
-        'e': 330,
-        'f': 349,
-        'g': 392,
-        'a': 440,
-        'b': 494,
-        'C': 523,
-    }
-    melody = 'cde'
-    rhythm = [1,1,1]
-    for tone, length in zip(melody, rhythm):
-        beeper.freq(tones[tone])
-        beeper.duty_u16(VOLUME)
-        await asyncio.sleep(0.2)
+def beep():
+    beeper.freq(440)
+    beeper.duty_u16(VOLUME)
+    sleep(0.1)
+    beeper.deinit()
 
 
-async def get_temperature():
-    total_temp = 0
-    cnt = 0
-    while cnt < 5:
+def get_temperature():
+    temp = 0
+    while True:
         temp = temperature_sensor.get_temperature(1)
-        await asyncio.sleep(0.02)
         if temp > 380 or temp < -70:
             continue
-        cnt += 1
-        total_temp += temp
-        print(cnt, temp)
-    return f'{total_temp/cnt+3.5:.1f}'
+        break
+    print(temp)
+    return f'{temp+3.5:.1f}'
 
 
 def get_time():
@@ -374,6 +361,7 @@ def get_time():
     year, month, day = map(int, date[:10].split('-'))
     hour, minute, second = map(int, date[11:19].split(':'))
     rtc.datetime((year, month, day, 0, hour, minute, second, 0))
+    response.close()
     sleep(2)
 
 
@@ -382,8 +370,8 @@ async def post_nfc(nfc_id):
     data = {'nfc_sn': nfc_id, 'seq_kindergarden': kindergarden_id}
     print('data')
     print(data)
-    response = requests.post('https://api.eobuba.co.kr/nfc', data=json.dumps(data), headers=headers)
-    print(response.json())
+    response = requests.post('http://api.eobuba.co.kr/nfc', data=json.dumps(data), headers=headers)
+    result = response.json()
     return response.json()
 
 
@@ -445,10 +433,9 @@ def tag():
         display_page('message')
         display_message('정보 확인 중..')
         nfc_id = ''.join([hex(i)[2:] for i in nfc_data])
-        asyncio.run(beep())
-        beeper.deinit()
-        temperature = asyncio.run(get_temperature())
+        beep()
         response = asyncio.run(post_nfc(nfc_id))
+        temperature = get_temperature()
         display_nfc(response, temperature)
 
 
