@@ -345,14 +345,15 @@ def beep():
 
 
 def get_temperature():
-    temp = 0
-    while True:
-        temp = temperature_sensor.get_temperature(1)
-        if temp > 380 or temp < -70:
-            continue
-        break
-    print(temp)
-    return f'{temp+3.5:.1f}'
+    amb_temp = obj_temp = -100
+    while amb_temp > 380 or amb_temp < -70:
+        amb_temp = temperature_sensor.get_temperature(0)
+    while obj_temp > 380 or obj_temp < -70:
+        obj_temp = temperature_sensor.get_temperature(1)
+    temp = obj_temp-amb_temp+31.5
+    print()
+    print(obj_temp+2.3, obj_temp-amb_temp+31.5)
+    return f'{temp:.1f}'
 
 
 def get_time():
