@@ -155,8 +155,8 @@ class Run:
         self.display_message(f'{new_version} 업데이트 완료')
         sleep(1)
         self.display_message('기기를 재시작합니다')
-        sleep(1)
         self.is_updated = True
+        sleep(3)
 
 
     def update_handler(self, timer):
@@ -175,7 +175,6 @@ class Run:
         elif data == b'e\x03\x04\x01\xff\xff\xff\x04\xff\xff\xff':
             print('update')
             self.update()
-            return
         elif data == b'e\x03\x03\x01\xff\xff\xff\x04\xff\xff\xff':
             print('wifi')
             self.wifi_init(is_init=False)
