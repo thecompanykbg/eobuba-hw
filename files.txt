@@ -1,6 +1,3 @@
-main.py
-repair.py
-files.txt
 run.py
 ili9341.py
 mlx90614.py
