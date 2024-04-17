@@ -94,7 +94,7 @@ def display_nfc(response, temperature):
             display_send('state.txt="하원"')
         else:
             display_send('state.txt="등원"')
-    sleep(1)
+    sleep(1.5)
     display_page('clock')
 
 
@@ -350,9 +350,9 @@ def get_temperature():
         amb_temp = temperature_sensor.get_temperature(0)
     while obj_temp > 380 or obj_temp < -70:
         obj_temp = temperature_sensor.get_temperature(1)
-    temp = obj_temp-amb_temp+31.5
+    temp = obj_temp-amb_temp+30.5
     print()
-    print(obj_temp+2.3, obj_temp-amb_temp+31.5)
+    print(obj_temp+2.3, amb_temp, obj_temp-amb_temp+30.5)
     return f'{temp:.1f}'
 
 
