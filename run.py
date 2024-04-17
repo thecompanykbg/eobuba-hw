@@ -133,7 +133,7 @@ class Run:
         f.close()
         print('done')
         
-        self.display_message(f'업데이트 중..')
+        self.display_message(f'{new_version} 업데이트 중..')
         response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
         file_names = response.text.split()
         response.close()
