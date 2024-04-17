@@ -439,7 +439,7 @@ class Run:
 
     def run(self, is_reload):
         self.awake_mode()
-        self.wifi_init(is_init=not is_reload)
+        self.wifi_init(is_init=True)
         
         self.get_time()
 
