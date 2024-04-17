@@ -1,6 +1,5 @@
 run.py
-ili9341.py
-mlx90614.py
 pn532.py
-xglcd_font.py
+mlx90614.py
+files.txt
 version.txt

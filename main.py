@@ -2,9 +2,14 @@ from restore import Restore
 
 
 Restore()
+del Restore
 
 
 from run import Run
 
 
-Run()
+while True:
+    try:
+        Run()
+    except:
+        print('reload')

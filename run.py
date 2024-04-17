@@ -154,9 +154,9 @@ class Run:
         print('Update complete.')
         self.display_message(f'{new_version} 업데이트 완료')
         sleep(1)
-        self.display_message('전원을 다시 켜주세요.')
-        while True:
-            pass
+        self.display_message('기기를 재시작합니다')
+        sleep(1)
+        raise Exception
 
 
     def update_handler(self, timer):
