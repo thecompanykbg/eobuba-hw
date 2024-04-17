@@ -11,10 +11,8 @@ is_reload = False
 
 
 while True:
-    try:
-        Run(is_reload)
-    except:
-        print('reload')
-        del sys.modules['run']
-        Run = __import__('run').Run
-        is_reload = True
+    Run(is_reload)
+    print('reload')
+    del sys.modules['run']
+    Run = __import__('run').Run
+    is_reload = True

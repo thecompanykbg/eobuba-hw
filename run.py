@@ -38,6 +38,7 @@ class Run:
         self.sleep_time = 0
         self.is_sleeping = False
         self.is_updated = False
+        self.is_connected = True
 
         self.wlan = network.WLAN(network.STA_IF)
         self.ap = network.WLAN(network.AP_IF)
@@ -117,7 +118,13 @@ class Run:
         self.display_message(f'현재 버전 {version}')
         sleep(0.5)
         self.display_message('업데이트 확인 중..')
-        response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
+
+        response = None
+        try:
+            response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
+        except:
+            self.is_connected = False
+            return
         print(response.text, version)
         new_version = response.text
         response.close()
@@ -134,16 +141,26 @@ class Run:
         print('done')
         
         self.display_message(f'{new_version} 업데이트 중..')
-        response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
+        response = None
+        try:
+            response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
+        except:
+            self.is_connected = False
+            return
         file_names = response.text.split()
         response.close()
         print(file_names)
         for file_name in file_names:
-            response = requests.get(f'http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/{file_name}')
-            f = open(file_name, 'w')
-            f.write(response.text)
-            response.close()
-            f.close()
+            response = None
+            try:
+                response = requests.get(f'http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/{file_name}')
+                f = open(file_name, 'w')
+                f.write(response.text)
+                response.close()
+                f.close()
+            except:
+                self.is_connected = False
+                return
         
         f = open('restore_check.txt', 'w')
         print('writing...')
@@ -254,9 +271,9 @@ class Run:
         else:
             self.display_message('와이파이를 설정하세요')
 
-        self.ap.active(True)
         self.ap.config(essid=self.ap_ssid, password=self.ap_password)
         self.ap.ifconfig(('192.168.4.1', '255.255.255.0', '192.168.4.1', '0.0.0.0'))
+        self.ap.active(True)
 
         network_list = []
         for nw in self.wlan.scan():
@@ -330,6 +347,7 @@ class Run:
         print(self.wlan.isconnected())
         print(self.wlan.ifconfig())
         print(self.wlan.status())
+        self.ap.active(False)
         sleep(0.5)
         return True
 
@@ -363,7 +381,12 @@ class Run:
 
 
     def get_time(self):
-        response = requests.get('http://worldtimeapi.org/api/timezone/Asia/Seoul')
+        response = None
+        try:
+            response = requests.get('http://worldtimeapi.org/api/timezone/Asia/Seoul')
+        except:
+            self.is_connected = False
+            return
         date = response.json()['datetime']
         year, month, day = map(int, date[:10].split('-'))
         hour, minute, second = map(int, date[11:19].split(':'))
@@ -377,7 +400,13 @@ class Run:
         data = {'nfc_sn': nfc_id, 'seq_kindergarden': self.kindergarden_id}
         print('data')
         print(data)
-        response = requests.post('http://api.eobuba.co.kr/nfc', data=json.dumps(data), headers=headers)
+
+        response = None
+        try:
+            response = requests.post('http://api.eobuba.co.kr/nfc', data=json.dumps(data), headers=headers)
+        except:
+            self.is_connected = False
+            return
         result = response.json()
         return response.json()
 
@@ -413,8 +442,15 @@ class Run:
         self.nfc.SAM_configuration()
 
         while True:
+            if not self.is_connected:
+                self.display_page('message')
+                self.display_message('와이파이 연결 실패')
+                self.wifi_init(is_init=False)
             if self.is_updated:
-                raise Exception
+                self.wlan.active(False)
+                self.wlan.disconnect()
+                sleep(0.5)
+                return
             nfc_data = None
             try:
                 nfc_data = self.nfc.read_passive_target()
