@@ -8,20 +8,6 @@ import requests
 import json
 
 
-ap_ssid = "Eobuba NFC"
-ap_password = "12341234"
-
-kindergarden_id = wifi_ssid = wifi_password = ''
-
-wlan = network.WLAN(network.STA_IF)
-ap = network.WLAN(network.AP_IF)
-
-hexadecimal = b'\xFF\xFF\xFF'
-display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=115200)
-
-run()
-
-
 def display_send(command):
     display.write(command)
     display.write(hexadecimal)
@@ -49,15 +35,17 @@ def update():
         f.close()
         f = open('version.txt', 'r')
     version = f.read()
+    f.close()
     response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
     print(response.text, version)
     new_version = response.text
     response.close()
-    if new_version == version:
-        print(f'{version} is latest version.')
-        display_message(f'현재 최신 버전입니다')
-        sleep(1)
-        return
+        
+    f = open('update_check.txt', 'w')
+    print('writing...')
+    f.write('1')
+    f.close()
+    print('done')
     
     display_message(f'업데이트 중..')
     response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
@@ -70,6 +58,13 @@ def update():
         f.write(response.text)
         response.close()
         f.close()
+    
+    f = open('update_check.txt', 'w')
+    print('writing...')
+    f.write('0')
+    f.close()
+    print('done')
+    
     print('Update complete.')
     display_message(f'{new_version} 업데이트 완료')
     sleep(1)
@@ -237,5 +232,33 @@ def wifi_init(is_init):
 
 
 def repair():
-    wifi_init(is_init=True)
-    update()
+    f = None
+    try:
+        f = open('update_check.txt', 'r')
+    except:
+        f = open('update_check.txt', 'w')
+        f.close()
+        f = open('update_check.txt', 'r')
+    print('file read...')
+    data = f.read()
+    f.close()
+    
+    print('data')
+    print(data)
+    
+    if data != '0':
+        wifi_init(is_init=True)
+        update()
+
+
+print('repair..')
+ap_ssid = "Eobuba NFC"
+ap_password = "12341234"
+
+kindergarden_id = wifi_ssid = wifi_password = ''
+
+wlan = network.WLAN(network.STA_IF)
+ap = network.WLAN(network.AP_IF)
+
+hexadecimal = b'\xFF\xFF\xFF'
+display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=115200)

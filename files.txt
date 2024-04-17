@@ -1,4 +1,3 @@
-fonts/Unispace12x24.c
 ili9341.py
 main.py
 mlx90614.py
