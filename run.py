@@ -63,8 +63,6 @@ def display_nfc(response, temperature):
 
 
 def update():
-    display_page('message')
-    display_message('업데이트 확인 중..')
     f = None
     try:
         f = open('version.txt', 'r')
@@ -74,6 +72,10 @@ def update():
         f = open('version.txt', 'r')
     version = f.read()
     f.close()
+    display_page('message')
+    display_message(f'현재 버전 {version}')
+    sleep(0.5)
+    display_message('업데이트 확인 중..')
     response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
     print(response.text, version)
     new_version = response.text
