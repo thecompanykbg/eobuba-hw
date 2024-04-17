@@ -13,7 +13,7 @@ from mlx90614 import MLX90614_I2C
 
 class Run:
 
-    def __init__(self):
+    def __init__(self, is_reload):
         self.ap_ssid = '\uc5b4\ubd80\ubc14 \uc124\uc815'
         self.ap_password = '12341234'
 
@@ -32,12 +32,12 @@ class Run:
         self.beeper = PWM(26)
         self.beeper.deinit()
 
-        self.DEBUG = True
         self.VOLUME = 20
         self.is_displaying = False
         self.sleep_limit = 300
         self.sleep_time = 0
         self.is_sleeping = False
+        self.is_updated = False
 
         self.wlan = network.WLAN(network.STA_IF)
         self.ap = network.WLAN(network.AP_IF)
@@ -49,7 +49,7 @@ class Run:
         self.update_timer = Timer()
         self.read_timer = Timer()
 
-        self.run()
+        self.run(is_reload)
 
 
     def display_send(self, command):
@@ -156,7 +156,7 @@ class Run:
         sleep(1)
         self.display_message('기기를 재시작합니다')
         sleep(1)
-        raise Exception
+        self.is_updated = True
 
 
     def update_handler(self, timer):
@@ -172,12 +172,13 @@ class Run:
             print('settings')
             self.display_page('settings')
             return
-        elif data == b'e\x03\x03\x01\xff\xff\xff\x04\xff\xff\xff':
-            print('wifi')
-            self.wifi_init(is_init=False)
         elif data == b'e\x03\x04\x01\xff\xff\xff\x04\xff\xff\xff':
             print('update')
             self.update()
+            return
+        elif data == b'e\x03\x03\x01\xff\xff\xff\x04\xff\xff\xff':
+            print('wifi')
+            self.wifi_init(is_init=False)
         elif data == b'e\x03\x02\x01\xff\xff\xff\x04\xff\xff\xff':
             print('back')
         self.display_page('clock')
@@ -413,6 +414,8 @@ class Run:
         self.nfc.SAM_configuration()
 
         while True:
+            if self.is_updated:
+                raise Exception
             nfc_data = None
             try:
                 nfc_data = self.nfc.read_passive_target()
@@ -434,18 +437,18 @@ class Run:
             self.display_nfc(response, temperature)
 
 
-    def run(self):
-        self.wifi_init(is_init=True)
-        
+    def run(self, is_reload):
         self.awake_mode()
-
+        self.wifi_init(is_init=not is_reload)
+        
         self.get_time()
 
         self.start_datetime_timer()
         self.start_update_timer()
         self.start_read_timer()
 
-        self.update()
+        if not is_reload:
+            self.update()
 
         self.display_page('clock')
         self.tag()
