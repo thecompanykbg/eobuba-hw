@@ -1,10 +1,10 @@
-from repair import repair
+from repair import Repair
 
 
-repair()
+Repair()
 
 
-from run import run
+from run import Run
 
 
-run()
+Run()
