@@ -61,7 +61,7 @@ class Restore:
         new_version = response.text
         response.close()
         
-        f = open('update_check.txt', 'w')
+        f = open('restore_check.txt', 'w')
         print('writing...')
         f.write('1')
         f.close()
@@ -79,7 +79,7 @@ class Restore:
             response.close()
             f.close()
         
-        f = open('update_check.txt', 'w')
+        f = open('restore_check.txt', 'w')
         print('writing...')
         f.write('0')
         f.close()
