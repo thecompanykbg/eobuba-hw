@@ -11,463 +11,441 @@ from pn532 import PN532Uart
 from mlx90614 import MLX90614_I2C
 
 
-def display_send(command):
-    display.write(command)
-    display.write(hexadecimal)
-    sleep(0.05)
-    response = display.read()
-    return response
+class Run:
+
+    def __init__(self):
+        self.ap_ssid = '\uc5b4\ubd80\ubc14 \uc124\uc815'
+        self.ap_password = '12341234'
+
+        self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
+
+        self.rtc = RTC()
+
+        self.week_days = ['월', '화', '수', '목', '금', '토', '일']
+
+        self.nfc = PN532Uart(1, tx=Pin(4), rx=Pin(5), debug=False)
+        self.nfc.SAM_configuration()
+
+        self.temperature_i2c = SoftI2C(scl=1, sda=0, freq=100000)
+        self.temperature_sensor = MLX90614_I2C(self.temperature_i2c, 0x5A)
+
+        self.beeper = PWM(26)
+        self.beeper.deinit()
+
+        self.DEBUG = True
+        self.VOLUME = 20
+        self.is_displaying = False
+        self.sleep_limit = 300
+        self.sleep_time = 0
+        self.is_sleeping = False
+
+        self.wlan = network.WLAN(network.STA_IF)
+        self.ap = network.WLAN(network.AP_IF)
+
+        self.hexadecimal = b'\xFF\xFF\xFF'
+        self.display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=115200)
+
+        self.datetime_timer = Timer()
+        self.update_timer = Timer()
+        self.read_timer = Timer()
+
+        self.run()
 
 
-def display_message(msg):
-    display_send(f'message.msg.txt="{msg}"')
+    def display_send(self, command):
+        self.display.write(command)
+        self.display.write(self.hexadecimal)
+        sleep(0.05)
+        response = self.display.read()
+        return response
 
 
-def display_page(page):
-    display_send(f'page {page}')
+    def display_message(self, msg):
+        self.display_send(f'message.msg.txt="{msg}"')
 
 
-def display_date(year, month, day, hour, minute, second, wd_idx):
-    yy = zfill(f'{year}', '0', 4)
-    MM = zfill(f'{month}', '0', 2)
-    dd = zfill(f'{day}', '0', 2)
-    hh = zfill(f'{hour}', '0', 2)
-    mm = zfill(f'{minute}', '0', 2)
-    ss = zfill(f'{second}', '0', 2)
-    wd = week_days[wd_idx]
-    display_send(f'date.txt="{yy}년 {MM}월 {dd}일({wd})"')
-    display_send(f'hour.txt="{hh}"')
-    display_send(f'minute.txt="{mm}"')
-    if second%2:
-        display_send('colon.txt=""')
-    else:
-        display_send('colon.txt=":"')
+    def display_page(self, page):
+        self.display_send(f'page {page}')
 
 
-def display_nfc(response, temperature):
-    result_code = response['resultCode']
-    if result_code < 0:
-        display_page('message')
-        display_message('등록되지 않은 NFC입니다')
-    else:
-        name, *_ = response['resultMsg'].split()
-        display_page('nfc_tag')
-        display_send(f'name.txt="{name}"')
-        display_send(f'temp.txt="{temperature}"')
-        if result_code >= 3:
-            display_send('state.txt="하원"')
+    def display_date(self, year, month, day, hour, minute, second, wd_idx):
+        yy = self.zfill(f'{year}', '0', 4)
+        MM = self.zfill(f'{month}', '0', 2)
+        dd = self.zfill(f'{day}', '0', 2)
+        hh = self.zfill(f'{hour}', '0', 2)
+        mm = self.zfill(f'{minute}', '0', 2)
+        ss = self.zfill(f'{second}', '0', 2)
+        wd = self.week_days[wd_idx]
+        self.display_send(f'date.txt="{yy}년 {MM}월 {dd}일({wd})"')
+        self.display_send(f'hour.txt="{hh}"')
+        self.display_send(f'minute.txt="{mm}"')
+        if second%2:
+            self.display_send('colon.txt=""')
         else:
-            display_send('state.txt="등원"')
-    sleep(1.5)
-    display_page('clock')
+            self.display_send('colon.txt=":"')
 
 
-def update():
-    f = None
-    try:
-        f = open('version.txt', 'r')
-    except:
-        f = open('version.txt', 'w')
-        f.close()
-        f = open('version.txt', 'r')
-    version = f.read()
-    f.close()
-    display_page('message')
-    display_message(f'현재 버전 {version}')
-    sleep(0.5)
-    display_message('업데이트 확인 중..')
-    response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
-    print(response.text, version)
-    new_version = response.text
-    response.close()
-    if new_version == version:
-        print(f'{version} is latest version.')
-        display_message(f'현재 최신 버전입니다')
-        sleep(1)
-        return
-
-    f = open('update_check.txt', 'w')
-    print('writing...')
-    f.write('1')
-    f.close()
-    print('done')
-    
-    display_message(f'업데이트 중..')
-    response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
-    file_names = response.text.split()
-    response.close()
-    print(file_names)
-    for file_name in file_names:
-        response = requests.get(f'http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/{file_name}')
-        f = open(file_name, 'w')
-        f.write(response.text)
-        response.close()
-        f.close()
-    
-    f = open('update_check.txt', 'w')
-    print('writing...')
-    f.write('0')
-    f.close()
-    print('done')
-    
-    print('Update complete.')
-    display_message(f'{new_version} 업데이트 완료')
-    sleep(1)
-    display_message('전원을 다시 켜주세요.')
-    while True:
-        pass
+    def display_nfc(self, response, temperature):
+        result_code = response['resultCode']
+        if result_code < 0:
+            self.display_page('message')
+            self.display_message('등록되지 않은 NFC입니다')
+        else:
+            name, *_ = response['resultMsg'].split()
+            self.display_page('nfc_tag')
+            self.display_send(f'name.txt="{name}"')
+            self.display_send(f'temp.txt="{temperature}"')
+            if result_code >= 3:
+                self.display_send('state.txt="하원"')
+            else:
+                self.display_send('state.txt="등원"')
+        sleep(1.5)
+        self.display_page('clock')
 
 
-def update_handler(timer):
-    update()
-    display_page('clock')
-
-
-def read_handler(timer):
-    data = display.read()
-    if data is None:
-        return
-    if data == b'e\x00\x06\x01\xff\xff\xff\x04\xff\xff\xff':
-        print('settings')
-        display_page('settings')
-        return
-    elif data == b'e\x03\x03\x01\xff\xff\xff\x04\xff\xff\xff':
-        print('wifi')
-        wifi_init(is_init=False)
-    elif data == b'e\x03\x04\x01\xff\xff\xff\x04\xff\xff\xff':
-        print('update')
-        update()
-    elif data == b'e\x03\x02\x01\xff\xff\xff\x04\xff\xff\xff':
-        print('back')
-    display_page('clock')
-
-
-def zfill(string, char, count):
-    return (char*count+string)[-count:]
-
-
-def datetime_handler(timer):
-    global sleep_time
-    year, month, day, wd_idx, hour, minute, second = rtc.datetime()[:7]
-    if not is_displaying and sleep_time < sleep_limit:
-        sleep_time += 1
-    if not is_sleeping and sleep_time >= sleep_limit:
-        sleep_mode()
-    if is_displaying or is_sleeping:
-        return
-    display_date(year, month, day, hour, minute, second, wd_idx)
-
-
-def web_login_page(network_list):
-    html = """<html><head><meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1"></head>
-              <body><h1>어부바 전자출결기기 Wi-fi 설정</h1>
-              <form><label for="ssid">그룹 ID(GROUP_ID): <input id="groupId" name="groupId"><br></label>
-              <label for="ssid">와이파이 이름: <select id="ssid" name="ssid">"""
-    html += ''.join([f'<option value="{network_name}">{network_name}</option>' for network_name in network_list])
-    html += """</select><br></label>
-               <label for="password">와이파이 비밀번호: <input id="password" name="password" type="password"></label><br>
-               <input hidden name="end">
-               <input type="submit" value="확인"></form></body></html>
-            """
-    return html
-
-
-def web_done_page():
-    html = """<html><head><meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1"></head>
-              <body><h1>설정 완료</h1></body></html>
-           """
-    return html
-
-
-def wifi_setting(is_wrong):
-    global kindergarden_id, wifi_ssid, wifi_password
-    
-    wlan.disconnect()
-    sleep(0.5)
-    ap.disconnect()
-    sleep(0.5)
-    
-    f = None
-    try:
-        f = open('wifi_data.txt', 'r')
-    except:
-        f = open('wifi_data.txt', 'w')
-        f.close()
-        f = open('wifi_data.txt', 'r')
-    print('file read...')
-    data = f.read()
-    f.close()
-        
-    if data.find('$') >= 0:
-        kindergarden_id, wifi_ssid, wifi_password = data.split('$')
-    print(kindergarden_id, wifi_ssid, wifi_password)
-    
-    if wifi_ssid != '':
-        return
-    
-    print('wifi setting..')
-    
-    display_page('message')
-    if is_wrong:
-        display_message('와이파이를 확인하세요')
-    else:
-        display_message('와이파이를 설정하세요')
-    
-
-    ap.config(essid=ap_ssid, password=ap_password)
-    ap.ifconfig(('192.168.4.1', '255.255.255.0', '192.168.4.1', '0.0.0.0'))
-
-    ap.active(True)
-
-    print(ap.ifconfig())
-
-    network_list = []
-    for nw in wlan.scan():
-        network_list.append(bytes.decode(nw[0]))
-    wlan.disconnect()
-    sleep(0.5)
-    
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind(('', 80))
-    s.listen(5)
-
-    while wifi_ssid == '':
-        conn, addr = s.accept()
-        req = str(conn.recv(1024))
-        response = web_login_page(network_list)
-        group_id_idx = req.find('/?groupId=')
-        ssid_idx = req.find('&ssid=')
-        password_idx = req.find('&password=')
-        end_idx = req.find('&end=')
-        if ssid_idx >= 0:
-            kindergarden_id = req[group_id_idx+10:ssid_idx]
-            wifi_ssid = req[ssid_idx+6:password_idx]
-            wifi_password = req[password_idx+10:end_idx]
-            print(kindergarden_id, wifi_ssid, wifi_password)
-            response = web_done_page()
-        conn.send(response)
-        conn.close()
-    s.close()
-    ap.disconnect()
-    sleep(0.5)
-    
-    f = open('wifi_data.txt', 'w')
-    print('writing...')
-    f.write(kindergarden_id)
-    f.write('$')
-    f.write(wifi_ssid)
-    f.write('$')
-    f.write(wifi_password)
-    f.close()
-    print('done')
-
-
-def wifi_reset():
-    global kindergarden_id, wifi_ssid, wifi_password
-    
-    kindergarden_id = wifi_ssid = wifi_password = ''
-    
-    wlan.disconnect()
-    sleep(0.5)
-    ap.disconnect()
-    sleep(0.5)
-    
-    f = open('wifi_data.txt', 'w')
-    print('Wi-fi init...')
-    f.write('')
-    f.close()
-    print('done')
-
-
-def wifi_connect():
-    wlan.active(True)
-    
-    display_page('message')
-    display_message('와이파이 연결 중..')
-
-    wlan.connect(wifi_ssid, wifi_password)
-    count = 0
-    while wlan.isconnected() == False:
-        if count >= 5:
-            print('Wi-fi connect fail')
-            return False
-        print('Wi-fi connecting..')
-        count += 1
-        sleep(3)
-    
-    display_message('와이파이 연결 완료')
-    print('Wi-fi connect success')
-    
-    print(wlan.isconnected())
-    print(wlan.ifconfig())
-    print(wlan.status())
-    sleep(0.5)
-    return True
-
-
-def wifi_init(is_init):
-    if not is_init:
-        wifi_reset()
-    wifi_setting(is_wrong=False)
-    while not wifi_connect():
-        wifi_reset()
-        wifi_setting(is_wrong=True)
-    ap.disconnect()
-    sleep(0.5)
-
-
-def beep():
-    beeper.freq(440)
-    beeper.duty_u16(VOLUME)
-    sleep(0.1)
-    beeper.deinit()
-
-
-def get_temperature():
-    amb_temp = obj_temp = -100
-    while amb_temp > 380 or amb_temp < -70:
-        amb_temp = temperature_sensor.get_temperature(0)
-    while obj_temp > 380 or obj_temp < -70:
-        obj_temp = temperature_sensor.get_temperature(1)
-    temp = obj_temp-amb_temp+30.5
-    print()
-    print(obj_temp+2.3, amb_temp, obj_temp-amb_temp+30.5)
-    return f'{temp:.1f}'
-
-
-def get_time():
-    response = requests.get('http://worldtimeapi.org/api/timezone/Asia/Seoul')
-    date = response.json()['datetime']
-    year, month, day = map(int, date[:10].split('-'))
-    hour, minute, second = map(int, date[11:19].split(':'))
-    rtc.datetime((year, month, day, 0, hour, minute, second, 0))
-    response.close()
-    sleep(2)
-
-
-async def post_nfc(nfc_id):
-    headers = {'Content-Type': 'application/json'}
-    data = {'nfc_sn': nfc_id, 'seq_kindergarden': kindergarden_id}
-    print('data')
-    print(data)
-    response = requests.post('http://api.eobuba.co.kr/nfc', data=json.dumps(data), headers=headers)
-    result = response.json()
-    return response.json()
-
-
-def start_display():
-    global is_displaying
-    is_displaying = True
-
-
-def stop_display():
-    global is_displaying
-    is_displaying = False
-
-
-def sleep_mode():
-    global is_sleeping
-    is_sleeping = True
-    display_send('sleep=1')
-
-
-def awake_mode():
-    global is_sleeping, sleep_time
-    is_sleeping = False
-    sleep_time = 0
-    display_send('sleep=0')
-
-
-def start_datetime_timer():
-    datetime_timer.init(mode=Timer.PERIODIC, period=1000, callback=datetime_handler)
-
-
-def stop_datetime_timer():
-    datetime_timer.deinit()
-
-
-def start_update_timer():
-    update_timer.init(mode=Timer.PERIODIC, period=21600000, callback=update_handler)
-
-
-def start_read_timer():
-    read_timer.init(mode=Timer.PERIODIC, period=100, callback=read_handler)
-
-
-def tag():
-    nfc.SAM_configuration()
-
-    while True:
-        nfc_data = None
+    def update(self):
+        f = None
         try:
-            nfc_data = nfc.read_passive_target()
-        except Exception as e:
-            nfc.release_targets()
-            print('time out')
-            continue
-        if nfc_data == None:
-            continue
-        print(nfc_data)
-        if is_sleeping:
-            awake_mode()
-        display_page('message')
-        display_message('정보 확인 중..')
-        nfc_id = ''.join([hex(i)[2:] for i in nfc_data])
-        beep()
-        response = asyncio.run(post_nfc(nfc_id))
-        temperature = get_temperature()
-        display_nfc(response, temperature)
+            f = open('version.txt', 'r')
+        except:
+            f = open('version.txt', 'w')
+            f.close()
+            f = open('version.txt', 'r')
+        version = f.read()
+        f.close()
+        self.display_page('message')
+        self.display_message(f'현재 버전 {version}')
+        sleep(0.5)
+        self.display_message('업데이트 확인 중..')
+        response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
+        print(response.text, version)
+        new_version = response.text
+        response.close()
+        if new_version == version:
+            print(f'{version} is latest version.')
+            self.display_message(f'현재 최신 버전입니다')
+            sleep(1)
+            return
+
+        f = open('update_check.txt', 'w')
+        print('writing...')
+        f.write('1')
+        f.close()
+        print('done')
+        
+        self.display_message(f'업데이트 중..')
+        response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
+        file_names = response.text.split()
+        response.close()
+        print(file_names)
+        for file_name in file_names:
+            response = requests.get(f'http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/{file_name}')
+            f = open(file_name, 'w')
+            f.write(response.text)
+            response.close()
+            f.close()
+        
+        f = open('update_check.txt', 'w')
+        print('writing...')
+        f.write('0')
+        f.close()
+        print('done')
+        
+        print('Update complete.')
+        self.display_message(f'{new_version} 업데이트 완료')
+        sleep(1)
+        self.display_message('전원을 다시 켜주세요.')
+        while True:
+            pass
 
 
-def run():
-    wifi_init(is_init=True)
-    
-    awake_mode()
-
-    get_time()
-
-    start_datetime_timer()
-    start_update_timer()
-    start_read_timer()
-
-    update()
-
-    display_page('clock')
-    tag()
+    def update_handler(self, timer):
+        self.update()
+        self.display_page('clock')
 
 
-ap_ssid = "Eobuba NFC"
-ap_password = "12341234"
+    def read_handler(self, timer):
+        data = self.display.read()
+        if data is None:
+            return
+        if data == b'e\x00\x06\x01\xff\xff\xff\x04\xff\xff\xff':
+            print('settings')
+            self.display_page('settings')
+            return
+        elif data == b'e\x03\x03\x01\xff\xff\xff\x04\xff\xff\xff':
+            print('wifi')
+            self.wifi_init(is_init=False)
+        elif data == b'e\x03\x04\x01\xff\xff\xff\x04\xff\xff\xff':
+            print('update')
+            self.update()
+        elif data == b'e\x03\x02\x01\xff\xff\xff\x04\xff\xff\xff':
+            print('back')
+        self.display_page('clock')
 
-kindergarden_id = wifi_ssid = wifi_password = ''
 
-rtc = RTC()
+    def zfill(self, string, char, count):
+        return (char*count+string)[-count:]
 
-week_days = ['월', '화', '수', '목', '금', '토', '일']
 
-nfc = PN532Uart(1, tx=Pin(4), rx=Pin(5), debug=False)
-nfc.SAM_configuration()
+    def datetime_handler(self, timer):
+        year, month, day, wd_idx, hour, minute, second = self.rtc.datetime()[:7]
+        if not self.is_displaying and self.sleep_time < self.sleep_limit:
+            self.sleep_time += 1
+        if not self.is_sleeping and self.sleep_time >= self.sleep_limit:
+            self.sleep_mode()
+        if self.is_displaying or self.is_sleeping:
+            return
+        self.display_date(year, month, day, hour, minute, second, wd_idx)
 
-temperature_i2c = SoftI2C(scl=1, sda=0, freq=100000)
-temperature_sensor = MLX90614_I2C(temperature_i2c, 0x5A)
 
-beeper = PWM(26)
-beeper.deinit()
+    def web_login_page(self, network_list):
+        html = """<html><head><meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1"></head>
+                <body><h1>어부바 전자출결기기 Wi-fi 설정</h1>
+                <form><label for="ssid">그룹 ID(GROUP_ID): <input id="groupId" name="groupId"><br></label>
+                <label for="ssid">와이파이 이름: <select id="ssid" name="ssid">"""
+        html += ''.join([f'<option value="{network_name}">{network_name}</option>' for network_name in network_list])
+        html += """</select><br></label>
+                <label for="password">와이파이 비밀번호: <input id="password" name="password" type="password"></label><br>
+                <input hidden name="end">
+                <input type="submit" value="확인"></form></body></html>
+                """
+        return html
 
-DEBUG = True
-VOLUME = 20
-is_displaying = False
-sleep_limit = 300
-sleep_time = 0
-is_sleeping = False
 
-wlan = network.WLAN(network.STA_IF)
-ap = network.WLAN(network.AP_IF)
+    def web_done_page(self):
+        html = """<html><head><meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1"></head>
+                <body><h1>설정 완료</h1></body></html>
+            """
+        return html
 
-hexadecimal = b'\xFF\xFF\xFF'
-display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=115200)
 
-datetime_timer = Timer()
-update_timer = Timer()
-read_timer = Timer()
+    def wifi_setting(self, is_wrong):
+        self.wlan.active(False)
+        self.wlan.disconnect()
+        sleep(0.5)
+
+        self.ap.active(False)
+        self.ap.disconnect()
+        sleep(0.5)
+        
+        f = None
+        try:
+            f = open('wifi_data.txt', 'r')
+        except:
+            f = open('wifi_data.txt', 'w')
+            f.close()
+            f = open('wifi_data.txt', 'r')
+        print('file read...')
+        data = f.read()
+        f.close()
+            
+        if data.find('$') >= 0:
+            self.kindergarden_id, self.wifi_ssid, self.wifi_password = data.split('$')
+        print(self.kindergarden_id, self.wifi_ssid, self.wifi_password)
+        
+        if self.wifi_ssid != '':
+            return
+        
+        print('wifi setting..')
+        
+        self.display_page('message')
+        if is_wrong:
+            self.display_message('와이파이를 확인하세요')
+        else:
+            self.display_message('와이파이를 설정하세요')
+
+        self.ap.active(True)
+        self.ap.config(essid=self.ap_ssid, password=self.ap_password)
+        self.ap.ifconfig(('192.168.4.1', '255.255.255.0', '192.168.4.1', '0.0.0.0'))
+
+        network_list = []
+        for nw in self.wlan.scan():
+            network_list.append(bytes.decode(nw[0]))
+        
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind(('', 80))
+        s.listen(5)
+
+        while self.wifi_ssid == '':
+            conn, addr = s.accept()
+            req = str(conn.recv(1024))
+            response = self.web_login_page(network_list)
+            group_id_idx = req.find('/?groupId=')
+            ssid_idx = req.find('&ssid=')
+            password_idx = req.find('&password=')
+            end_idx = req.find('&end=')
+            if ssid_idx >= 0:
+                self.kindergarden_id = req[group_id_idx+10:ssid_idx]
+                self.wifi_ssid = req[ssid_idx+6:password_idx]
+                self.wifi_password = req[password_idx+10:end_idx]
+                print(self.kindergarden_id, self.wifi_ssid, self.wifi_password)
+                response = self.web_done_page()
+            conn.send(response)
+            conn.close()
+        s.close()
+        self.ap.disconnect()
+        sleep(0.5)
+        
+        f = open('wifi_data.txt', 'w')
+        print('writing...')
+        f.write(self.kindergarden_id)
+        f.write('$')
+        f.write(self.wifi_ssid)
+        f.write('$')
+        f.write(self.wifi_password)
+        f.close()
+        print('done')
+
+
+    def wifi_reset(self):
+        self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
+
+        f = open('wifi_data.txt', 'w')
+        print('Wi-fi init...')
+        f.write('')
+        f.close()
+        print('done')
+
+
+    def wifi_connect(self):
+        self.wlan.active(True)
+        
+        self.display_page('message')
+        self.display_message('와이파이 연결 중..')
+
+        self.wlan.connect(self.wifi_ssid, self.wifi_password)
+        count = 0
+        while self.wlan.isconnected() == False:
+            if count >= 5:
+                print('Wi-fi connect fail')
+                return False
+            print('Wi-fi connecting..')
+            count += 1
+            sleep(3)
+        
+        self.display_message('와이파이 연결 완료')
+        print('Wi-fi connect success')
+        
+        print(self.wlan.isconnected())
+        print(self.wlan.ifconfig())
+        print(self.wlan.status())
+        sleep(0.5)
+        return True
+
+
+    def wifi_init(self, is_init):
+        if not is_init:
+            self.wifi_reset()
+        self.wifi_setting(is_wrong=False)
+        while not self.wifi_connect():
+            self.wifi_reset()
+            self.wifi_setting(is_wrong=True)
+        sleep(0.5)
+
+
+    def beep(self):
+        self.beeper.freq(440)
+        self.beeper.duty_u16(self.VOLUME)
+        sleep(0.1)
+        self.beeper.deinit()
+
+
+    def get_temperature(self):
+        amb_temp = obj_temp = -100
+        while amb_temp > 380 or amb_temp < -70:
+            amb_temp = self.temperature_sensor.get_temperature(0)
+        while obj_temp > 380 or obj_temp < -70:
+            obj_temp = self.temperature_sensor.get_temperature(1)
+        temp = obj_temp-amb_temp+30.5
+        print(obj_temp+2.3, amb_temp, obj_temp-amb_temp+30.5)
+        return f'{temp:.1f}'
+
+
+    def get_time(self):
+        response = requests.get('http://worldtimeapi.org/api/timezone/Asia/Seoul')
+        date = response.json()['datetime']
+        year, month, day = map(int, date[:10].split('-'))
+        hour, minute, second = map(int, date[11:19].split(':'))
+        self.rtc.datetime((year, month, day, 0, hour, minute, second, 0))
+        response.close()
+        sleep(2)
+
+
+    async def post_nfc(self, nfc_id):
+        headers = {'Content-Type': 'application/json'}
+        data = {'nfc_sn': nfc_id, 'seq_kindergarden': self.kindergarden_id}
+        print('data')
+        print(data)
+        response = requests.post('http://api.eobuba.co.kr/nfc', data=json.dumps(data), headers=headers)
+        result = response.json()
+        return response.json()
+
+
+    def sleep_mode(self):
+        self.is_sleeping = True
+        self.display_send('sleep=1')
+
+
+    def awake_mode(self):
+        self.is_sleeping = False
+        self.sleep_time = 0
+        self.display_send('sleep=0')
+
+
+    def start_datetime_timer(self):
+        self.datetime_timer.init(mode=Timer.PERIODIC, period=1000, callback=self.datetime_handler)
+
+
+    def stop_datetime_timer(self):
+        self.datetime_timer.deinit()
+
+
+    def start_update_timer(self):
+        self.update_timer.init(mode=Timer.PERIODIC, period=21600000, callback=self.update_handler)
+
+
+    def start_read_timer(self):
+        self.read_timer.init(mode=Timer.PERIODIC, period=100, callback=self.read_handler)
+
+
+    def tag(self):
+        self.nfc.SAM_configuration()
+
+        while True:
+            nfc_data = None
+            try:
+                nfc_data = self.nfc.read_passive_target()
+            except Exception as e:
+                self.nfc.release_targets()
+                print('time out')
+                continue
+            if nfc_data == None:
+                continue
+            print(nfc_data)
+            if self.is_sleeping:
+                self.awake_mode()
+            self.display_page('message')
+            self.display_message('정보 확인 중..')
+            nfc_id = ''.join([hex(i)[2:] for i in nfc_data])
+            self.beep()
+            response = asyncio.run(self.post_nfc(nfc_id))
+            temperature = self.get_temperature()
+            self.display_nfc(response, temperature)
+
+
+    def run(self):
+        self.wifi_init(is_init=True)
+        
+        self.awake_mode()
+
+        self.get_time()
+
+        self.start_datetime_timer()
+        self.start_update_timer()
+        self.start_read_timer()
+
+        self.update()
+
+        self.display_page('clock')
+        self.tag()
