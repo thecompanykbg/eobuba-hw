@@ -1,5 +1,7 @@
-ili9341.py
 main.py
+repair.py
+run.py
+ili9341.py
 mlx90614.py
 pn532.py
 xglcd_font.py
