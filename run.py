@@ -342,6 +342,7 @@ class Run:
             sleep(3)
         
         self.display_message('와이파이 연결 완료')
+        self.is_connected = True
         print('Wi-fi connect success')
         
         print(self.wlan.isconnected())
@@ -455,7 +456,6 @@ class Run:
             try:
                 nfc_data = self.nfc.read_passive_target()
             except Exception as e:
-                self.nfc.release_targets()
                 print('time out')
                 continue
             if nfc_data == None:
@@ -465,6 +465,7 @@ class Run:
                 self.awake_mode()
             self.display_page('message')
             self.display_message('정보 확인 중..')
+            self.nfc.release_targets()
             nfc_id = ''.join([hex(i)[2:] for i in nfc_data])
             self.beep()
             response = asyncio.run(self.post_nfc(nfc_id))
