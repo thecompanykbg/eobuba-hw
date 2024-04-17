@@ -127,7 +127,7 @@ class Run:
             sleep(1)
             return
 
-        f = open('update_check.txt', 'w')
+        f = open('restore_check.txt', 'w')
         print('writing...')
         f.write('1')
         f.close()
@@ -145,7 +145,7 @@ class Run:
             response.close()
             f.close()
         
-        f = open('update_check.txt', 'w')
+        f = open('restore_check.txt', 'w')
         print('writing...')
         f.write('0')
         f.close()
