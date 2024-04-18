@@ -88,9 +88,8 @@ class Restore:
         print('Update complete.')
         self.display_message(f'{new_version} 업데이트 완료')
         sleep(1)
-        self.display_message('전원을 다시 켜주세요.')
-        while True:
-            pass
+        self.display_message('기기를 재시작합니다')
+        sleep(3)
 
 
     def web_login_page(self, network_list):
