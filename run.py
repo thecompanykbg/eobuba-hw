@@ -1,4 +1,4 @@
-from time import sleep
+from time import sleep, ticks_ms
 import asyncio
 from machine import I2C, Pin, SoftI2C, SPI, PWM, Timer, RTC, UART
 
@@ -187,6 +187,7 @@ class Run:
         data = self.display.read()
         if data is None:
             return
+        self.awake_mode()
         if data == b'e\x00\x06\x01\xff\xff\xff\x04\xff\xff\xff':
             print('settings')
             self.display_page('settings')
@@ -287,7 +288,10 @@ class Run:
         s.bind(('', 80))
         s.listen(5)
 
-        while self.wifi_ssid == '':
+        timeout_ms = 30000
+        end_time = ticks_ms() + timeout_ms
+
+        while self.wifi_ssid == '' and ticks_ms() < end_time:
             conn, addr = s.accept()
             req = str(conn.recv(1024))
             response = self.web_login_page(network_list)
@@ -304,9 +308,10 @@ class Run:
             conn.send(response)
             conn.close()
         s.close()
+        sleep(0.5)
         self.ap.disconnect()
         sleep(0.5)
-        
+                
         f = open('wifi_data.txt', 'w')
         print('writing...')
         f.write(self.kindergarden_id)
