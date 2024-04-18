@@ -14,9 +14,9 @@ class Player:
         self.I2S_BUFFER_SIZE = 20000
 
         # I2S pin number
-        self.SCK_PIN = 2 #13
+        self.SCK_PIN = 2
         self.WS_PIN  = self.SCK_PIN + 1 # SCK_PIN number + 1
-        self.SD_PIN  = 15
+        self.SD_PIN  = 10
     
     def play(self, file_path):
         # read wave file
