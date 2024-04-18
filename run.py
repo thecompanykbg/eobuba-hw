@@ -9,6 +9,7 @@ import json
 
 from pn532 import PN532Uart
 from mlx90614 import MLX90614_I2C
+from max98357 import Player
 
 
 class Run:
@@ -29,8 +30,7 @@ class Run:
         self.temperature_i2c = SoftI2C(scl=1, sda=0, freq=100000)
         self.temperature_sensor = MLX90614_I2C(self.temperature_i2c, 0x5A)
 
-        self.beeper = PWM(26)
-        self.beeper.deinit()
+        self.player = Player()
 
         self.VOLUME = 20
         self.is_displaying = False
@@ -98,8 +98,10 @@ class Run:
             self.display_send(f'temp.txt="{temperature}"')
             if result_code >= 3:
                 self.display_send('state.txt="하원"')
+                self.player.play('02.wav')
             else:
                 self.display_send('state.txt="등원"')
+                self.player.play('01.wav')
         sleep(1.5)
         self.display_page('clock')
 
@@ -274,6 +276,7 @@ class Run:
         self.ap.config(essid=self.ap_ssid, password=self.ap_password)
         self.ap.ifconfig(('192.168.4.1', '255.255.255.0', '192.168.4.1', '0.0.0.0'))
         self.ap.active(True)
+        sleep(0.5)
 
         network_list = []
         for nw in self.wlan.scan():
@@ -361,13 +364,6 @@ class Run:
             self.wifi_reset()
             self.wifi_setting(is_wrong=True)
         sleep(0.5)
-
-
-    def beep(self):
-        self.beeper.freq(440)
-        self.beeper.duty_u16(self.VOLUME)
-        sleep(0.1)
-        self.beeper.deinit()
 
 
     def get_temperature(self):
@@ -461,13 +457,13 @@ class Run:
             if nfc_data == None:
                 continue
             print(nfc_data)
+            self.player.play('beep.wav')
             if self.is_sleeping:
                 self.awake_mode()
             self.display_page('message')
             self.display_message('정보 확인 중..')
             self.nfc.release_targets()
             nfc_id = ''.join([hex(i)[2:] for i in nfc_data])
-            self.beep()
             response = asyncio.run(self.post_nfc(nfc_id))
             temperature = self.get_temperature()
             self.display_nfc(response, temperature)

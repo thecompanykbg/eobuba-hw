@@ -1,5 +1,6 @@
 run.py
 pn532.py
 mlx90614.py
+max98357.py
 files.txt
 version.txt
