@@ -124,8 +124,9 @@ class Run:
         response = None
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
-        except:
+        except Exception as e:
             self.is_connected = False
+            raise e
             return
         print(response.text, version)
         new_version = response.text
@@ -448,6 +449,7 @@ class Run:
                 self.display_page('message')
                 self.display_message('와이파이 연결 실패')
                 self.wifi_init(is_init=False)
+                self.display_page('clock')
             if self.is_updated:
                 self.wlan.active(False)
                 self.wlan.disconnect()
