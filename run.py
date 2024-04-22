@@ -32,7 +32,6 @@ class Run:
 
         self.player = Player()
 
-        self.VOLUME = 20
         self.is_displaying = False
         self.sleep_limit = 300
         self.sleep_time = 0
