@@ -48,6 +48,7 @@ class Run:
         self.datetime_timer = Timer()
         self.update_timer = Timer()
         self.read_timer = Timer()
+        self.wifi_timer = Timer()
 
         self.run(is_reload)
 
@@ -68,6 +69,19 @@ class Run:
         self.display_send(f'page {page}')
 
 
+    def display_wifi(self, wifi_connected):
+        if wifi_connected:
+            self.display_send(f'clock.status.pic=2')
+            self.display_send(f'nfc_tag.status.pic=2')
+            self.display_send(f'message.status.pic=2')
+            self.display_send(f'settings.status.pic=2')
+        else:
+            self.display_send(f'clock.status.pic=3')
+            self.display_send(f'nfc_tag.status.pic=3')
+            self.display_send(f'message.status.pic=3')
+            self.display_send(f'settings.status.pic=3')
+
+
     def display_date(self, year, month, day, hour, minute, second, wd_idx):
         yy = self.zfill(f'{year}', '0', 4)
         MM = self.zfill(f'{month}', '0', 2)
@@ -76,23 +90,22 @@ class Run:
         mm = self.zfill(f'{minute}', '0', 2)
         ss = self.zfill(f'{second}', '0', 2)
         wd = self.week_days[wd_idx]
-        self.display_send(f'date.txt="{yy}년 {MM}월 {dd}일({wd})"')
-        self.display_send(f'hour.txt="{hh}"')
-        self.display_send(f'minute.txt="{mm}"')
+        self.display_send(f'clock.date.txt="{yy}년 {MM}월 {dd}일({wd})"')
+        self.display_send(f'clock.hour.txt="{hh}"')
+        self.display_send(f'clock.minute.txt="{mm}"')
         if second%2:
-            self.display_send('colon.txt=""')
+            self.display_send('clock.colon.txt=""')
         else:
-            self.display_send('colon.txt=":"')
+            self.display_send('clock.colon.txt=":"')
 
 
     def display_nfc(self, response, temperature):
         result_code = response['resultCode']
         if result_code < 0:
-            self.display_page('message')
             self.display_message('등록되지 않은 NFC입니다')
+            self.display_page('message')
         else:
             name, *_ = response['resultMsg'].split()
-            self.display_page('nfc_tag')
             self.display_send(f'name.txt="{name}"')
             self.display_send(f'temp.txt="{temperature}"')
             if result_code >= 3:
@@ -101,6 +114,7 @@ class Run:
             else:
                 self.display_send('state.txt="등원"')
                 self.player.play('01.wav')
+            self.display_page('nfc_tag')
         sleep(1.5)
         self.display_page('clock')
 
@@ -115,8 +129,8 @@ class Run:
             f = open('version.txt', 'r')
         version = f.read()
         f.close()
-        self.display_page('message')
         self.display_message(f'현재 버전 {version}')
+        self.display_page('message')
         sleep(0.5)
         self.display_message('업데이트 확인 중..')
 
@@ -216,6 +230,10 @@ class Run:
         if self.is_displaying or self.is_sleeping:
             return
         self.display_date(year, month, day, hour, minute, second, wd_idx)
+    
+
+    def wifi_handler(self, timer):
+        self.display_wifi(self.wlan.isconnected())
 
 
     def web_login_page(self, network_list):
@@ -247,6 +265,8 @@ class Run:
         self.ap.active(False)
         self.ap.disconnect()
         sleep(0.5)
+
+        self.display_wifi(self.wlan.isconnected())
         
         f = None
         try:
@@ -336,8 +356,8 @@ class Run:
     def wifi_connect(self):
         self.wlan.active(True)
         
-        self.display_page('message')
         self.display_message('와이파이 연결 중..')
+        self.display_page('message')
 
         self.wlan.connect(self.wifi_ssid, self.wifi_password)
         count = 0
@@ -352,6 +372,8 @@ class Run:
         self.display_message('와이파이 연결 완료')
         self.is_connected = True
         print('Wi-fi connect success')
+        
+        self.display_wifi(self.wlan.isconnected())
         
         print(self.wlan.isconnected())
         print(self.wlan.ifconfig())
@@ -377,8 +399,8 @@ class Run:
             amb_temp = self.temperature_sensor.get_temperature(0)
         while obj_temp > 380 or obj_temp < -70:
             obj_temp = self.temperature_sensor.get_temperature(1)
-        temp = obj_temp-amb_temp+30.5
-        print(obj_temp+2.3, amb_temp, obj_temp-amb_temp+30.5)
+        temp = obj_temp+3
+        print(obj_temp, amb_temp)
         return f'{temp:.1f}'
 
 
@@ -440,13 +462,17 @@ class Run:
         self.read_timer.init(mode=Timer.PERIODIC, period=100, callback=self.read_handler)
 
 
+    def start_wifi_timer(self):
+        self.wifi_timer.init(mode=Timer.PERIODIC, period=5000, callback=self.wifi_handler)
+
+
     def tag(self):
         self.nfc.SAM_configuration()
 
         while True:
             if not self.is_connected:
-                self.display_page('message')
                 self.display_message('와이파이 연결 실패')
+                self.display_page('message')
                 self.wifi_init(is_init=False)
                 self.display_page('clock')
             if self.is_updated:
@@ -466,8 +492,8 @@ class Run:
             self.player.play('beep.wav')
             if self.is_sleeping:
                 self.awake_mode()
-            self.display_page('message')
             self.display_message('정보 확인 중..')
+            self.display_page('message')
             self.nfc.release_targets()
             nfc_id = ''.join([hex(i)[2:] for i in nfc_data])
             response = asyncio.run(self.post_nfc(nfc_id))
@@ -484,6 +510,7 @@ class Run:
         self.start_datetime_timer()
         self.start_update_timer()
         self.start_read_timer()
+        self.start_wifi_timer()
 
         if not is_reload:
             self.update()
