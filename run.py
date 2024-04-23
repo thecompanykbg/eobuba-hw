@@ -38,6 +38,7 @@ class Run:
         self.is_sleeping = False
         self.is_updated = False
         self.is_connected = True
+        self.is_setting = False
         self.temp_mode = 1
 
         self.wlan = network.WLAN(network.STA_IF)
@@ -107,8 +108,9 @@ class Run:
     def display_nfc(self, response, temperature=None):
         result_code = response['resultCode']
         if result_code < 0:
-            self.display_message('등록되지 않은 NFC입니다')
+            self.display_message('등록되지 않은 카드입니다')
             self.display_page('message')
+            sleep(1.5)
         else:
             name, *_ = response['resultMsg'].split()
             nfc_tag_page = 'nfc_tag'
@@ -119,12 +121,12 @@ class Run:
                 self.display_send(f'{nfc_tag_page}.temp.txt="{temperature}"')
             if result_code >= 3:
                 self.display_send(f'{nfc_tag_page}.state.txt="하원"')
+                self.display_page(nfc_tag_page)
                 self.player.play('02.wav')
             else:
                 self.display_send(f'{nfc_tag_page}.state.txt="등원"')
+                self.display_page(nfc_tag_page)
                 self.player.play('01.wav')
-            self.display_page(nfc_tag_page)
-        sleep(1.5)
         self.display_page('clock')
 
 
@@ -213,6 +215,7 @@ class Run:
         self.awake_mode()
         print(data)
         if data == b'e\x00\x06\x01\xff\xff\xff':
+            self.start_setting()
             print('settings')
             self.display_page('settings')
             return
@@ -239,6 +242,7 @@ class Run:
         elif data == b'e\x05\x06\x01\xff\xff\xff':
             self.set_temp_mode(3)
             return
+        self.stop_setting()
         self.display_page('clock')
 
 
@@ -450,7 +454,6 @@ class Run:
         while not self.wifi_connect():
             self.wifi_reset()
             self.wifi_setting(is_wrong=True)
-        sleep(0.5)
 
 
     def get_temperature(self):
@@ -465,6 +468,7 @@ class Run:
 
 
     def get_time(self):
+        self.display_message('시간 불러오는 중..')
         response = None
         try:
             response = requests.get('http://worldtimeapi.org/api/timezone/Asia/Seoul')
@@ -476,7 +480,6 @@ class Run:
         hour, minute, second = map(int, date[11:19].split(':'))
         self.rtc.datetime((year, month, day, 0, hour, minute, second, 0))
         response.close()
-        sleep(2)
 
 
     async def post_nfc(self, nfc_id):
@@ -524,6 +527,14 @@ class Run:
 
     def start_wifi_timer(self):
         self.wifi_timer.init(mode=Timer.PERIODIC, period=5000, callback=self.wifi_handler)
+    
+
+    def start_setting(self):
+        self.is_setting = True
+
+
+    def stop_setting(self):
+        self.is_setting = False
 
 
     def tag(self):
@@ -546,12 +557,11 @@ class Run:
             except Exception as e:
                 print('time out')
                 continue
-            if nfc_data == None:
+            if self.is_setting or nfc_data == None:
                 continue
             print(nfc_data)
             self.player.play('beep.wav')
-            if self.is_sleeping:
-                self.awake_mode()
+            self.awake_mode()
             self.nfc.release_targets()
             nfc_id = ''.join([hex(i)[2:] for i in nfc_data])
             if self.temp_mode == 1:
@@ -580,15 +590,15 @@ class Run:
         self.awake_mode()
         self.wifi_init(is_init=True)
         
+        if not is_reload:
+            self.update()
+
         self.get_time()
 
         self.start_datetime_timer()
         self.start_update_timer()
         self.start_read_timer()
         self.start_wifi_timer()
-
-        if not is_reload:
-            self.update()
 
         self.load_temp_mode()
 
