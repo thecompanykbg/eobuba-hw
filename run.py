@@ -41,6 +41,9 @@ class Run:
         self.is_setting = False
         self.temp_mode = 1
 
+        self.version = ''
+        self.error = 0
+
         self.wlan = network.WLAN(network.STA_IF)
         self.ap = network.WLAN(network.AP_IF)
 
@@ -53,6 +56,46 @@ class Run:
         self.wifi_timer = Timer()
 
         self.run(is_reload)
+    
+
+    def load_data(self):
+        f = data = None
+        try:
+            f = open('data.txt', 'r')
+            data = eval(f.read())
+        except:
+            data = {'group_id': '', 'ssid': '', 'password': '', 'version': '0.0.23', 'mode': 1, 'error': 0}
+            f = open('data.txt', 'w')
+            f.write(str(data))
+            f.close()
+        
+        self.kindergarden_id = data.get('group_id', '')
+        self.wifi_ssid = data.get('ssid', '')
+        self.wifi_password = data.get('password', '')
+
+        self.version = data.get('version', '')
+        self.temp_mode = data.get('mode', 1)
+        self.error = data.get('error', 0)
+
+    
+
+    def save_data(self, key, value):
+        data = {
+            'group_id': self.kindergarden_id,
+            'ssid': self.wifi_ssid,
+            'password': self.wifi_password,
+            'version': self.version,
+            'mode': self.temp_mode,
+            'error': self.error
+        }
+        data[key] = value
+        
+        print('writing..')
+        f = open('data.txt', 'w')
+        f.write(str(data))
+        f.close()
+        print('done')
+
 
 
     def display_send(self, command):
@@ -131,16 +174,7 @@ class Run:
 
 
     def update(self):
-        f = None
-        try:
-            f = open('version.txt', 'r')
-        except:
-            f = open('version.txt', 'w')
-            f.close()
-            f = open('version.txt', 'r')
-        version = f.read()
-        f.close()
-        self.display_message(f'현재 버전 {version}')
+        self.display_message(f'현재 버전 {self.version}')
         self.display_page('message')
         sleep(0.5)
         self.display_message('업데이트 확인 중..')
@@ -152,21 +186,18 @@ class Run:
             self.is_connected = False
             raise e
             return
-        print(response.text, version)
+        print(response.text, self.version)
         new_version = response.text
         response.close()
-        if new_version == version:
-            print(f'{version} is latest version.')
+        if new_version == self.version:
+            print(f'{self.version} is latest version.')
             self.display_message(f'현재 최신 버전입니다')
             sleep(1)
             return
 
-        f = open('restore_check.txt', 'w')
-        print('writing...')
-        f.write('1')
-        f.close()
+        self.save_data('error', 1)
         print('done')
-        
+
         self.display_message(f'{new_version} 업데이트 중..')
         response = None
         try:
@@ -189,11 +220,7 @@ class Run:
                 self.is_connected = False
                 return
         
-        f = open('restore_check.txt', 'w')
-        print('writing...')
-        f.write('0')
-        f.close()
-        print('done')
+        self.save_data('error', 0)
         
         print('Update complete.')
         self.display_message(f'{new_version} 업데이트 완료')
@@ -248,10 +275,7 @@ class Run:
 
     def set_temp_mode(self, mode):
         self.temp_mode = mode
-        f = open('temp_mode.txt', 'w')
-        print('writing...')
-        f.write(str(mode))
-        f.close()
+        self.save_data('mode', mode)
         print('set mode', mode)
         self.display_send(f'temp_mode.mode1_btn.pic={7+(mode != 1)}')
         self.display_send(f'temp_mode.mode2_btn.pic={9+(mode != 2)}')
@@ -259,25 +283,9 @@ class Run:
 
 
     def load_temp_mode(self):
-        f = None
-        print('loading...')
-        try:
-            f = open('temp_mode.txt', 'r')
-        except:
-            f = open('temp_mode.txt', 'w')
-            f.write('1')
-            f.close()
-            f = open('temp_mode.txt', 'r')
-        mode = f.read()
-        f.close()
-        try:
-            mode = int(mode)
-        except:
-            mode = 1
-        self.temp_mode = mode
-        self.display_send(f'temp_mode.mode1_btn.pic={7+(mode != 1)}')
-        self.display_send(f'temp_mode.mode2_btn.pic={9+(mode != 2)}')
-        self.display_send(f'temp_mode.mode3_btn.pic={11+(mode != 3)}')
+        self.display_send(f'temp_mode.mode1_btn.pic={7+(self.temp_mode != 1)}')
+        self.display_send(f'temp_mode.mode2_btn.pic={9+(self.temp_mode != 2)}')
+        self.display_send(f'temp_mode.mode3_btn.pic={11+(self.temp_mode != 3)}')
 
 
     def zfill(self, string, char, count):
@@ -331,19 +339,6 @@ class Run:
 
         self.display_wifi()
         
-        f = None
-        try:
-            f = open('wifi_data.txt', 'r')
-        except:
-            f = open('wifi_data.txt', 'w')
-            f.close()
-            f = open('wifi_data.txt', 'r')
-        print('file read...')
-        data = f.read()
-        f.close()
-            
-        if data.find('$') >= 0:
-            self.kindergarden_id, self.wifi_ssid, self.wifi_password = data.split('$')
         print(self.kindergarden_id, self.wifi_ssid, self.wifi_password)
         
         if self.wifi_ssid != '':
@@ -395,25 +390,18 @@ class Run:
         sleep(0.5)
         self.ap.disconnect()
         sleep(0.5)
-                
-        f = open('wifi_data.txt', 'w')
-        print('writing...')
-        f.write(self.kindergarden_id)
-        f.write('$')
-        f.write(self.wifi_ssid)
-        f.write('$')
-        f.write(self.wifi_password)
-        f.close()
-        print('done')
+
+        self.save_data('group_id', self.kindergarden_id)
+        self.save_data('ssid', self.wifi_ssid)
+        self.save_data('password', self.wifi_password)
 
 
     def wifi_reset(self):
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
 
-        f = open('wifi_data.txt', 'w')
         print('Wi-fi init...')
-        f.write('')
-        f.close()
+        self.save_data('ssid', '')
+        self.save_data('password', '')
         print('done')
 
 
@@ -485,7 +473,6 @@ class Run:
     async def post_nfc(self, nfc_id):
         headers = {'Content-Type': 'application/json'}
         data = {'nfc_sn': nfc_id, 'seq_kindergarden': self.kindergarden_id}
-        print('data')
         print(data)
 
         response = None
@@ -588,6 +575,8 @@ class Run:
 
 
     def run(self, is_reload):
+        self.load_data()
+
         self.awake_mode()
         self.wifi_init(is_init=True)
         

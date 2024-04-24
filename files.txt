@@ -4,5 +4,4 @@ mlx90614.py
 max98357.py
 wave.py
 chunk.py
-files.txt
 version.txt
