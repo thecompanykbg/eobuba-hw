@@ -11,7 +11,7 @@ class Player:
         # read frame number
         self.READ_FRAME_NUM = 1024
         # I2S buffer size(bytes)
-        self.I2S_BUFFER_SIZE = 20000
+        self.I2S_BUFFER_SIZE = 2000
 
         # I2S pin number
         self.SCK_PIN = 2

@@ -33,7 +33,7 @@ class Run:
         self.player = Player()
 
         self.is_displaying = False
-        self.sleep_limit = 300
+        self.sleep_limit = 180
         self.sleep_time = 0
         self.is_sleeping = False
         self.is_updated = False
@@ -110,7 +110,7 @@ class Run:
         if result_code < 0:
             self.display_message('등록되지 않은 카드입니다')
             self.display_page('message')
-            sleep(1.5)
+            self.player.play('/sounds/not_registered.wav')
         else:
             name, *_ = response['resultMsg'].split()
             nfc_tag_page = 'nfc_tag'
@@ -122,11 +122,11 @@ class Run:
             if result_code >= 3:
                 self.display_send(f'{nfc_tag_page}.state.txt="하원"')
                 self.display_page(nfc_tag_page)
-                self.player.play('02.wav')
+                self.player.play('/sounds/leave.wav')
             else:
                 self.display_send(f'{nfc_tag_page}.state.txt="등원"')
                 self.display_page(nfc_tag_page)
-                self.player.play('01.wav')
+                self.player.play('/sounds/arrive.wav')
         self.display_page('clock')
 
 
@@ -489,11 +489,12 @@ class Run:
         print(data)
 
         response = None
-        try:
-            response = requests.post('http://api.eobuba.co.kr/nfc', data=json.dumps(data), headers=headers)
-        except:
-            self.is_connected = False
-            return
+        while response is None:
+            try:
+                response = requests.post('http://api.eobuba.co.kr/nfc', data=json.dumps(data), headers=headers)
+            except:
+                self.is_connected = False
+                return
         result = response.json()
         return response.json()
 
@@ -560,7 +561,7 @@ class Run:
             if self.is_setting or nfc_data == None:
                 continue
             print(nfc_data)
-            self.player.play('beep.wav')
+            self.player.play('/sounds/beep.wav')
             self.awake_mode()
             self.nfc.release_targets()
             nfc_id = ''.join([hex(i)[2:] for i in nfc_data])
