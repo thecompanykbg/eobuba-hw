@@ -484,9 +484,26 @@ class Run:
         response.close()
 
 
-    async def post_nfc(self, nfc_id):
+    async def post_nfc(self, nfc_id, temperature=0):
+        year, month, day, wd_idx, hour, minute, second = self.rtc.datetime()[:7]
+        print(type(hour))
+        yy = self.zfill(f'{year}', '0', 4)
+        MM = self.zfill(f'{month}', '0', 2)
+        dd = self.zfill(f'{day}', '0', 2)
+        hh = self.zfill(f'{hour}', '0', 2)
+        mm = self.zfill(f'{minute}', '0', 2)
+        ss = self.zfill(f'{second}', '0', 2)
+        datetime = f'{yy}-{MM}-{dd} {hh}:{mm}:{ss}'
         headers = {'Content-Type': 'application/json'}
-        data = {'nfc_sn': nfc_id, 'seq_kindergarden': self.kindergarden_id}
+        data = {
+            'nfc_sn': nfc_id,
+            'seq_kindergarden': self.kindergarden_id,
+            'version': self.version,
+            'inout_type': '1' if hour < 12 else '2',
+            'date_time': datetime,
+            'temperature': f'{temperature}',
+            'result_type': '1'
+        }
         print(data)
 
         response = None
@@ -573,7 +590,7 @@ class Run:
                 temperature = self.get_temperature()
                 self.display_message('정보 확인 중..')
                 self.display_page('message')
-                response = asyncio.run(self.post_nfc(nfc_id))
+                response = asyncio.run(self.post_nfc(nfc_id, temperature))
                 self.display_nfc(response, temperature)
             elif self.temp_mode == 2:
                 self.display_message('체온을 측정해 주세요')
@@ -582,7 +599,7 @@ class Run:
                 temperature = self.get_temperature()
                 self.display_message('정보 확인 중..')
                 self.display_page('message')
-                response = asyncio.run(self.post_nfc(nfc_id))
+                response = asyncio.run(self.post_nfc(nfc_id, temperature))
                 self.display_nfc(response, temperature)
             else:
                 self.display_message('정보 확인 중..')
