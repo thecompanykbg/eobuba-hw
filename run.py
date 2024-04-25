@@ -30,6 +30,9 @@ class Run:
         self.temperature_i2c = SoftI2C(scl=1, sda=0, freq=100000)
         self.temperature_sensor = MLX90614_I2C(self.temperature_i2c, 0x5A)
 
+        self.hexadecimal = b'\xFF\xFF\xFF'
+        self.display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=9600)
+
         self.player = Player()
 
         self.is_displaying = False
@@ -39,24 +42,24 @@ class Run:
         self.is_updated = False
         self.is_connected = True
         self.is_setting = False
-        self.temp_mode = 1
 
         self.version = ''
+        self.brightness = 100
+        self.temp_mode = 1
         self.error = 0
+        self.wifi_state_time = 0
 
         self.wlan = network.WLAN(network.STA_IF)
         self.ap = network.WLAN(network.AP_IF)
-
-        self.hexadecimal = b'\xFF\xFF\xFF'
-        self.display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=115200)
 
         self.datetime_timer = Timer()
         self.update_timer = Timer()
         self.read_timer = Timer()
         self.wifi_timer = Timer()
+        self.wifi_time_timer = Timer()
 
         self.run(is_reload)
-    
+
 
     def load_data(self):
         f = data = None
@@ -64,7 +67,15 @@ class Run:
             f = open('data.txt', 'r')
             data = eval(f.read())
         except:
-            data = {'group_id': '', 'ssid': '', 'password': '', 'version': '0.0.23', 'mode': 1, 'error': 0}
+            data = {
+                'group_id': '',
+                'ssid': '',
+                'password': '',
+                'version': '0.0.23',
+                'mode': 1,
+                'brightness': 100,
+                'error': 0
+            }
             f = open('data.txt', 'w')
             f.write(str(data))
             f.close()
@@ -72,11 +83,10 @@ class Run:
         self.kindergarden_id = data.get('group_id', '')
         self.wifi_ssid = data.get('ssid', '')
         self.wifi_password = data.get('password', '')
-
         self.version = data.get('version', '')
         self.temp_mode = data.get('mode', 1)
+        self.brightness = data.get('brightness', 100)
         self.error = data.get('error', 0)
-
     
 
     def save_data(self, key, value):
@@ -86,7 +96,8 @@ class Run:
             'password': self.wifi_password,
             'version': self.version,
             'mode': self.temp_mode,
-            'error': self.error
+            'error': self.error,
+            'brightness': self.brightness
         }
         data[key] = value
         
@@ -95,7 +106,6 @@ class Run:
         f.write(str(data))
         f.close()
         print('done')
-
 
 
     def display_send(self, command):
@@ -112,23 +122,6 @@ class Run:
 
     def display_page(self, page):
         self.display_send(f'page {page}')
-
-
-    def display_wifi(self):
-        if self.wlan.isconnected():
-            self.display_send(f'clock.status.pic=1')
-            self.display_send(f'nfc_tag_temp.status.pic=1')
-            self.display_send(f'nfc_tag.status.pic=1')
-            self.display_send(f'message.status.pic=1')
-            self.display_send(f'settings.status.pic=1')
-            self.display_send(f'temp_mode.status.pic=1')
-        else:
-            self.display_send(f'clock.status.pic=2')
-            self.display_send(f'nfc_tag_temp.status.pic=2')
-            self.display_send(f'nfc_tag.status.pic=2')
-            self.display_send(f'message.status.pic=2')
-            self.display_send(f'settings.status.pic=2')
-            self.display_send(f'temp_mode.status.pic=2')
 
 
     def display_date(self, year, month, day, hour, minute, second, wd_idx):
@@ -246,19 +239,26 @@ class Run:
             print('settings')
             self.display_page('settings')
             return
-        elif data == b'e\x04\x06\x01\xff\xff\xff':
-            print('temp_mode')
-            self.display_page('temp_mode')
-            return
         elif data == b'e\x04\x04\x01\xff\xff\xff':
             print('update')
             self.update()
         elif data == b'e\x04\x03\x01\xff\xff\xff':
             print('wifi')
             self.wifi_init(is_init=False)
+        elif data == b'e\x04\x06\x01\xff\xff\xff':
+            print('temp_mode')
+            self.display_page('temp_mode')
+            return
+        elif data == b'e\x04\x07\x01\xff\xff\xff':
+            self.display_page('display')
+            return
         elif data == b'e\x03\x02\x01\xff\xff\xff':
             print('back')
         elif data == b'e\x05\x02\x01\xff\xff\xff':
+            print('back')
+        elif data == b'e\x06\x02\x01\xff\xff\xff':
+            brightness = int.from_bytes(self.display_send('get display.slider.val')[1:3], 'little', True)
+            self.set_display_brightness(brightness)
             print('back')
         elif data == b'e\x05\x03\x01\xff\xff\xff':
             self.set_temp_mode(1)
@@ -277,15 +277,22 @@ class Run:
         self.temp_mode = mode
         self.save_data('mode', mode)
         print('set mode', mode)
-        self.display_send(f'temp_mode.mode1_btn.pic={7+(mode != 1)}')
-        self.display_send(f'temp_mode.mode2_btn.pic={9+(mode != 2)}')
-        self.display_send(f'temp_mode.mode3_btn.pic={11+(mode != 3)}')
+        self.display_send(f'temp_mode.mode1_btn.pic={10+(mode != 1)}')
+        self.display_send(f'temp_mode.mode2_btn.pic={12+(mode != 2)}')
+        self.display_send(f'temp_mode.mode3_btn.pic={14+(mode != 3)}')
 
 
-    def load_temp_mode(self):
-        self.display_send(f'temp_mode.mode1_btn.pic={7+(self.temp_mode != 1)}')
-        self.display_send(f'temp_mode.mode2_btn.pic={9+(self.temp_mode != 2)}')
-        self.display_send(f'temp_mode.mode3_btn.pic={11+(self.temp_mode != 3)}')
+    def load_display_data(self):
+        self.display_send(f'display.slider.val={self.brightness}')
+        self.display_send(f'temp_mode.mode1_btn.pic={10+(self.temp_mode != 1)}')
+        self.display_send(f'temp_mode.mode2_btn.pic={12+(self.temp_mode != 2)}')
+        self.display_send(f'temp_mode.mode3_btn.pic={14+(self.temp_mode != 3)}')
+
+
+    def set_display_brightness(self, brightness):
+        self.display_send(f'dims={brightness}')
+        print('set brightness', brightness)
+        self.save_data('brightness', brightness)
 
 
     def zfill(self, string, char, count):
@@ -301,10 +308,29 @@ class Run:
         if self.is_displaying or self.is_sleeping:
             return
         self.display_date(year, month, day, hour, minute, second, wd_idx)
-    
 
-    def wifi_handler(self, timer):
-        self.display_wifi()
+
+    def wifi_time_handler(self, timer):
+        if self.wlan.isconnected():
+            self.display_send(f'clock.status.pic={self.wifi_state_time+1}')
+            self.display_send(f'nfc_tag_temp.status.pic={self.wifi_state_time+1}')
+            self.display_send(f'nfc_tag.status.pic={self.wifi_state_time+1}')
+            self.display_send(f'message.status.pic={self.wifi_state_time+1}')
+            self.display_send(f'settings.status.pic={self.wifi_state_time+1}')
+            self.display_send(f'temp_mode.status.pic={self.wifi_state_time+1}')
+            self.display_send(f'display.status.pic={self.wifi_state_time+1}')
+            self.wifi_state_time += 1
+            if self.wifi_state_time > 2:
+                self.wifi_state_time = 0
+        else:
+            self.wifi_state_time = 0
+            self.display_send('clock.status.pic=4')
+            self.display_send('nfc_tag_temp.status.pic=4')
+            self.display_send('nfc_tag.status.pic=4')
+            self.display_send('message.status.pic=4')
+            self.display_send('settings.status.pic=4')
+            self.display_send('temp_mode.status.pic=4')
+            self.display_send('display.status.pic=4')
 
 
     def web_login_page(self, network_list):
@@ -316,29 +342,17 @@ class Run:
         html += """</select><br></label>
                 <label for="password">와이파이 비밀번호: <input id="password" name="password" type="password"></label><br>
                 <input hidden name="end">
-                <input type="submit" value="확인"></form></body></html>
-                """
+                <input type="submit" value="확인"></form></body></html>"""
         return html
 
 
     def web_done_page(self):
         html = """<html><head><meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1"></head>
-                <body><h1>설정 완료</h1></body></html>
-            """
+                <body><h1>설정 완료</h1></body></html>"""
         return html
 
 
     def wifi_setting(self, is_wrong):
-        self.wlan.active(False)
-        self.wlan.disconnect()
-        sleep(0.5)
-
-        self.ap.active(False)
-        self.ap.disconnect()
-        sleep(0.5)
-
-        self.display_wifi()
-        
         print(self.kindergarden_id, self.wifi_ssid, self.wifi_password)
         
         if self.wifi_ssid != '':
@@ -353,8 +367,9 @@ class Run:
         
         self.display_page('message')
 
+        self.wlan.active(False)
         self.ap.config(essid=self.ap_ssid, password=self.ap_password)
-        self.ap.ifconfig(('192.168.4.1', '255.255.255.0', '192.168.4.1', '0.0.0.0'))
+        self.ap.ifconfig()
         self.ap.active(True)
         sleep(0.5)
 
@@ -400,6 +415,7 @@ class Run:
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
 
         print('Wi-fi init...')
+        self.save_data('kindergarden_id', '')
         self.save_data('ssid', '')
         self.save_data('password', '')
         print('done')
@@ -424,8 +440,6 @@ class Run:
         self.display_message('와이파이 연결 완료')
         self.is_connected = True
         print('Wi-fi connect success')
-        
-        self.display_wifi()
         
         print(self.wlan.isconnected())
         print(self.wlan.ifconfig())
@@ -476,12 +490,13 @@ class Run:
         print(data)
 
         response = None
-        while response is None:
-            try:
-                response = requests.post('http://api.eobuba.co.kr/nfc', data=json.dumps(data), headers=headers)
-            except:
-                self.is_connected = False
-                return
+        try:
+            response = requests.post('http://api.eobuba.co.kr/nfc', data=json.dumps(data), headers=headers)
+        except:
+            self.is_connected = False
+            return
+        if response is None:
+            return
         result = response.json()
         return response.json()
 
@@ -511,10 +526,6 @@ class Run:
 
     def start_read_timer(self):
         self.read_timer.init(mode=Timer.PERIODIC, period=10, callback=self.read_handler)
-
-
-    def start_wifi_timer(self):
-        self.wifi_timer.init(mode=Timer.PERIODIC, period=5000, callback=self.wifi_handler)
     
 
     def start_setting(self):
@@ -523,6 +534,10 @@ class Run:
 
     def stop_setting(self):
         self.is_setting = False
+
+
+    def start_wifi_time_timer(self):
+        self.wifi_time_timer.init(mode=Timer.PERIODIC, period=1000, callback=self.wifi_time_handler)
 
 
     def tag(self):
@@ -539,13 +554,15 @@ class Run:
                 self.wlan.disconnect()
                 sleep(0.5)
                 return
+            if self.is_setting:
+                continue
             nfc_data = None
             try:
                 nfc_data = self.nfc.read_passive_target()
             except Exception as e:
                 print('time out')
                 continue
-            if self.is_setting or nfc_data == None:
+            if nfc_data == None:
                 continue
             print(nfc_data)
             self.player.play('/sounds/beep.wav')
@@ -588,9 +605,9 @@ class Run:
         self.start_datetime_timer()
         self.start_update_timer()
         self.start_read_timer()
-        self.start_wifi_timer()
+        self.start_wifi_time_timer()
 
-        self.load_temp_mode()
+        self.load_display_data()
 
         self.display_page('clock')
         self.tag()
