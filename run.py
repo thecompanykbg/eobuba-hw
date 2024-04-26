@@ -218,7 +218,8 @@ class Run:
         
         self.save_data('error', 0)
         self.save_data('state', 3)
-        
+        self.save_data('version', str(new_version))
+
         print('Update complete.')
         self.display_message(f'{new_version} 업데이트 완료')
         sleep(1)
