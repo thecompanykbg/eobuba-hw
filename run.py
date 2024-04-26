@@ -157,12 +157,15 @@ class Run:
                 self.display_send(f'{nfc_tag_page}.temp.txt="{temperature}"')
             if result_code >= 3:
                 self.display_send(f'{nfc_tag_page}.state.txt="하원"')
-                self.display_page(nfc_tag_page)
-                self.player.play('/sounds/leave.wav')
             else:
                 self.display_send(f'{nfc_tag_page}.state.txt="등원"')
-                self.display_page(nfc_tag_page)
+            self.display_page(nfc_tag_page)
+            if result_code == 1:
                 self.player.play('/sounds/arrive.wav')
+            elif result_code == 3:
+                self.player.play('/sounds/leave.wav')
+            else:
+                self.player.play('/sounds/card_already.wav')
         self.display_page('clock')
 
 
@@ -402,7 +405,6 @@ class Run:
             conn.send(response)
             conn.close()
         s.close()
-        sleep(0.5)
         self.ap.disconnect()
         sleep(0.5)
 
@@ -591,12 +593,25 @@ class Run:
                 self.display_message('정보 확인 중..')
                 self.display_page('message')
                 response = asyncio.run(self.post_nfc(nfc_id, temperature))
+                if float(temperature) > 37.5:
+                    self.display_message('체온이 높습니다')
+                    self.player.play('/sounds/temp_high.wav')
+                elif float(temperature) < 32:
+                    self.display_message('체온이 낮습니다')
+                    self.player.play('/sounds/temp_low.wav')
                 self.display_nfc(response, temperature)
             elif self.temp_mode == 2:
                 self.display_message('체온을 측정해 주세요')
                 self.display_page('message')
-                sleep(1)
+                sleep(2)
                 temperature = self.get_temperature()
+                if float(temperature) < 32:
+                    self.display_message('체온이 측정되지 않음')
+                    self.player.play('/sounds/not_measured.wav')
+                    self.display_message('카드를 다시 대주세요')
+                    self.player.play('/sounds/card_again.wav')
+                    self.display_page('clock')
+                    continue
                 self.display_message('정보 확인 중..')
                 self.display_page('message')
                 response = asyncio.run(self.post_nfc(nfc_id, temperature))

@@ -56,9 +56,7 @@ class Player:
                 i2s.write(audio_data)
                 # read audio data
                 audio_data = wave_file.readframes(self.READ_FRAME_NUM)
-            sleep(frame_num/framerate)
-            
+            sleep(0.5)
+
             # stop I2S
             i2s.deinit()
-            
-            sleep(0.5)
