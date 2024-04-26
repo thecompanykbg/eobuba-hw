@@ -20,6 +20,7 @@ class Restore:
         self.temp_mode = 1
         self.error = 0
         self.brightness = 100
+        self.state = 0
 
         self.wifi_state_time = 0
 
@@ -45,7 +46,8 @@ class Restore:
                 'version': '0',
                 'mode': 1,
                 'brightness': 100,
-                'error': 0
+                'error': 1,
+                'state': 0
             }
             f = open('data.txt', 'w')
             f.write(str(data))
@@ -58,6 +60,7 @@ class Restore:
         self.temp_mode = data.get('mode', 1)
         self.brightness = data.get('brightness', 100)
         self.error = data.get('error', 1)
+        self.state = data.get('state', 0)
 
 
     def save_data(self, key, value):
@@ -67,8 +70,9 @@ class Restore:
             'password': self.wifi_password,
             'version': self.version,
             'mode': self.temp_mode,
+            'brightness': self.brightness,
             'error': self.error,
-            'brightness': self.brightness
+            'state': self.state
         }
         data[key] = value
         
@@ -96,7 +100,7 @@ class Restore:
 
 
     def wifi_time_handler(self, timer):
-        if self.wlan.isconnected():
+        if self.wlan.isconnected() and timer is not None:
             self.display_send(f'clock.status.pic={self.wifi_state_time+1}')
             self.display_send(f'nfc_tag_temp.status.pic={self.wifi_state_time+1}')
             self.display_send(f'nfc_tag.status.pic={self.wifi_state_time+1}')
@@ -242,12 +246,21 @@ class Restore:
         sleep(0.5)
 
 
-    def wifi_reset(self):
+    def wifi_clear(self):
         print('Wi-fi reset...')
+        self.wlan.disconnect()
+        self.wifi_time_handler(None)
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
         self.save_data('kindergarden_id', '')
         self.save_data('ssid', '')
         self.save_data('password', '')
+
+
+    def wifi_reset(self):
+        self.display_message('와이파이를 재설정합니다')
+        self.display_page('message')
+        self.save_data('state', 2)
+        reset()
 
 
     def wifi_connect(self):
@@ -278,13 +291,10 @@ class Restore:
         return True
 
 
-    def wifi_init(self, is_init):
-        self.stop_wifi_time_timer()
-        if not is_init:
-            self.wifi_reset()
+    def wifi_init(self):
         self.wifi_setting(is_wrong=False)
         while not self.wifi_connect():
-            self.wifi_reset()
+            self.wifi_clear()
             self.wifi_setting(is_wrong=True)
 
 
@@ -302,7 +312,9 @@ class Restore:
         print('restore', self.error)
         
         if self.error != 0:
-            self.wifi_init(is_init=True)
-            self.update()
-            return True
-        return False
+            if self.state == 1:
+                self.wifi_clear()
+                self.wifi_reset()
+            else:
+                self.wifi_init()
+                self.update()
