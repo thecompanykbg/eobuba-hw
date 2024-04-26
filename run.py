@@ -633,7 +633,8 @@ class Run:
 
     def run(self):
         self.load_data()
-        self.player.play('/sounds/eobuba.wav')
+        if self.state == 0:
+            self.player.play('/sounds/eobuba.wav')
 
         self.awake_mode()
         if self.state == 1:
