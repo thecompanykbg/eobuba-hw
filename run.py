@@ -1,6 +1,6 @@
 from time import sleep, ticks_ms
 import asyncio
-from machine import I2C, Pin, SoftI2C, SPI, PWM, Timer, RTC, UART
+from machine import I2C, Pin, SoftI2C, SPI, PWM, Timer, RTC, UART, reset
 
 import network
 import socket
@@ -17,8 +17,6 @@ class Run:
     def __init__(self, is_reload):
         self.ap_ssid = '\uc5b4\ubd80\ubc14 \uc124\uc815'
         self.ap_password = '12341234'
-
-        self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
 
         self.rtc = RTC()
 
@@ -39,14 +37,14 @@ class Run:
         self.sleep_limit = 180
         self.sleep_time = 0
         self.is_sleeping = False
-        self.is_updated = False
-        self.is_connected = True
         self.is_setting = False
 
-        self.version = ''
-        self.brightness = 100
+        self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
+        self.version = '0'
         self.temp_mode = 1
         self.error = 0
+        self.brightness = 100
+
         self.wifi_state_time = 0
 
         self.wlan = network.WLAN(network.STA_IF)
@@ -71,7 +69,7 @@ class Run:
                 'group_id': '',
                 'ssid': '',
                 'password': '',
-                'version': '0.0.23',
+                'version': '0',
                 'mode': 1,
                 'brightness': 100,
                 'error': 0
@@ -83,10 +81,10 @@ class Run:
         self.kindergarden_id = data.get('group_id', '')
         self.wifi_ssid = data.get('ssid', '')
         self.wifi_password = data.get('password', '')
-        self.version = data.get('version', '')
+        self.version = data.get('version', '0')
         self.temp_mode = data.get('mode', 1)
         self.brightness = data.get('brightness', 100)
-        self.error = data.get('error', 0)
+        self.error = data.get('error', 1)
     
 
     def save_data(self, key, value):
@@ -179,28 +177,24 @@ class Run:
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
         except Exception as e:
-            self.is_connected = False
-            raise e
-            return
+            reset()
         print(response.text, self.version)
         new_version = response.text
         response.close()
         if new_version == self.version:
             print(f'{self.version} is latest version.')
             self.display_message(f'현재 최신 버전입니다')
-            sleep(1)
+            sleep(0.5)
             return
 
         self.save_data('error', 1)
-        print('done')
 
         self.display_message(f'{new_version} 업데이트 중..')
         response = None
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
-        except:
-            self.is_connected = False
-            return
+        except Exception as e:
+            reset()
         file_names = response.text.split()
         response.close()
         print(file_names)
@@ -212,9 +206,8 @@ class Run:
                 f.write(response.text)
                 response.close()
                 f.close()
-            except:
-                self.is_connected = False
-                return
+            except Exception as e:
+                reset()
         
         self.save_data('error', 0)
         
@@ -222,8 +215,8 @@ class Run:
         self.display_message(f'{new_version} 업데이트 완료')
         sleep(1)
         self.display_message('기기를 재시작합니다')
-        self.is_updated = True
-        sleep(3)
+        sleep(1)
+        reset()
 
 
     def update_handler(self, timer):
@@ -405,22 +398,22 @@ class Run:
             conn.send(response)
             conn.close()
         s.close()
-        self.ap.disconnect()
         sleep(0.5)
 
         self.save_data('group_id', self.kindergarden_id)
         self.save_data('ssid', self.wifi_ssid)
         self.save_data('password', self.wifi_password)
 
+        self.ap.disconnect()
+        sleep(0.5)
+
 
     def wifi_reset(self):
+        print('Wi-fi reset...')
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
-
-        print('Wi-fi init...')
         self.save_data('kindergarden_id', '')
         self.save_data('ssid', '')
         self.save_data('password', '')
-        print('done')
 
 
     def wifi_connect(self):
@@ -440,8 +433,8 @@ class Run:
             sleep(3)
         
         self.display_message('와이파이 연결 완료')
-        self.is_connected = True
         print('Wi-fi connect success')
+        self.start_wifi_time_timer()
         
         print(self.wlan.isconnected())
         print(self.wlan.ifconfig())
@@ -452,6 +445,7 @@ class Run:
 
 
     def wifi_init(self, is_init):
+        self.stop_wifi_time_timer()
         if not is_init:
             self.wifi_reset()
         self.wifi_setting(is_wrong=False)
@@ -476,9 +470,8 @@ class Run:
         response = None
         try:
             response = requests.get('http://worldtimeapi.org/api/timezone/Asia/Seoul')
-        except:
-            self.is_connected = False
-            return
+        except Exception as e:
+            reset()
         date = response.json()['datetime']
         year, month, day = map(int, date[:10].split('-'))
         hour, minute, second = map(int, date[11:19].split(':'))
@@ -511,9 +504,8 @@ class Run:
         response = None
         try:
             response = requests.post('http://api.eobuba.co.kr/nfc', data=json.dumps(data), headers=headers)
-        except:
-            self.is_connected = False
-            return
+        except Exception as e:
+            reset()
         if response is None:
             return
         result = response.json()
@@ -545,7 +537,7 @@ class Run:
 
     def start_read_timer(self):
         self.read_timer.init(mode=Timer.PERIODIC, period=10, callback=self.read_handler)
-    
+
 
     def start_setting(self):
         self.is_setting = True
@@ -559,26 +551,20 @@ class Run:
         self.wifi_time_timer.init(mode=Timer.PERIODIC, period=1000, callback=self.wifi_time_handler)
 
 
+    def stop_wifi_time_timer(self):
+        self.wifi_time_timer.deinit()
+
+
     def tag(self):
         self.nfc.SAM_configuration()
 
         while True:
-            if not self.is_connected:
-                self.display_message('와이파이 연결 실패')
-                self.display_page('message')
-                self.wifi_init(is_init=False)
-                self.display_page('clock')
-            if self.is_updated:
-                self.wlan.active(False)
-                self.wlan.disconnect()
-                sleep(0.5)
-                return
             if self.is_setting:
                 continue
             nfc_data = None
             try:
                 nfc_data = self.nfc.read_passive_target()
-            except Exception as e:
+            except:
                 print('time out')
                 continue
             if nfc_data == None:
@@ -637,7 +623,6 @@ class Run:
         self.start_datetime_timer()
         self.start_update_timer()
         self.start_read_timer()
-        self.start_wifi_time_timer()
 
         self.load_display_data()
 
