@@ -13,6 +13,9 @@ class Restore:
         self.ap_ssid = '\uc5b4\ubd80\ubc14 \uc124\uc815'
         self.ap_password = '12341234'
 
+        self.hexadecimal = b'\xFF\xFF\xFF'
+        self.display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=9600)
+
         self.is_displaying = False
 
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
@@ -27,8 +30,7 @@ class Restore:
         self.wlan = network.WLAN(network.STA_IF)
         self.ap = network.WLAN(network.AP_IF)
 
-        self.hexadecimal = b'\xFF\xFF\xFF'
-        self.display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=9600)
+        self.wifi_time_timer = Timer()
 
         self.restore()
 
