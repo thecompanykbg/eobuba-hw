@@ -1,4 +1,4 @@
-from time import sleep, ticks_ms
+from time import sleep
 import asyncio
 from machine import I2C, Pin, SoftI2C, SPI, PWM, Timer, RTC, UART, reset
 
@@ -393,11 +393,7 @@ class Run:
         s.bind(('', 80))
         s.listen(5)
 
-        timeout_ms = 30000
-        end_time = ticks_ms() + timeout_ms
-
-        while self.wifi_ssid == '' and ticks_ms() < end_time:
-            print(ticks_ms(), end_time)
+        while self.wifi_ssid == '':
             conn, addr = s.accept()
             req = str(conn.recv(1024))
             response = self.web_login_page(network_list)

@@ -1,4 +1,4 @@
-from time import sleep, ticks_ms
+from time import sleep
 from machine import Pin, UART, Timer, reset
 
 import network
@@ -221,10 +221,7 @@ class Restore:
         s.bind(('', 80))
         s.listen(5)
 
-        timeout_ms = 30000
-        end_time = ticks_ms() + timeout_ms
-
-        while self.wifi_ssid == '' and ticks_ms() < end_time:
+        while self.wifi_ssid == '':
             conn, addr = s.accept()
             req = str(conn.recv(1024))
             response = self.web_login_page(network_list)
