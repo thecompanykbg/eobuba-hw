@@ -1,4 +1,4 @@
-from time import sleep
+from time import sleep, ticks_ms
 from machine import Pin, UART, Timer, reset
 
 import network
@@ -83,6 +83,7 @@ class Restore:
         f.write(str(data))
         f.close()
         print('done')
+        self.load_data()
 
 
     def display_send(self, command):

@@ -108,6 +108,7 @@ class Run:
         f.write(str(data))
         f.close()
         print('done')
+        self.load_data()
 
 
     def display_send(self, command):
