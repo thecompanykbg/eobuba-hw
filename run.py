@@ -150,7 +150,7 @@ class Run:
             self.display_message('등록되지 않은 카드입니다')
             self.display_page('message')
             sleep(1)
-            self.display_message(f'{result_code['nfc_sn']}')
+            self.display_message(f'{response['nfc_sn']}')
             self.player.play('/sounds/not_registered.wav')
         else:
             name, *_ = response['resultMsg'].split()
