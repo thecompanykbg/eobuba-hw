@@ -1,6 +1,6 @@
 from time import sleep
 import asyncio
-from machine import I2C, Pin, SPI, PWM, Timer, RTC, UART, reset
+from machine import Pin, Timer, RTC, UART, reset
 
 import network
 import socket
