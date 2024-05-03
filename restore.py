@@ -13,24 +13,15 @@ class Restore:
         self.ap_ssid = '\uc5b4\ubd80\ubc14 \uc124\uc815'
         self.ap_password = '12341234'
 
-        self.hexadecimal = b'\xFF\xFF\xFF'
-        self.display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=9600)
-
-        self.is_displaying = False
-
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
         self.version = '0'
-        self.temp_mode = 1
         self.error = 0
-        self.brightness = 100
         self.state = 0
-
-        self.wifi_state_time = 0
 
         self.wlan = network.WLAN(network.STA_IF)
         self.ap = network.WLAN(network.AP_IF)
 
-        self.wifi_time_timer = Timer()
+        self.wifi_timer = Timer()
 
         self.restore()
 
@@ -46,8 +37,6 @@ class Restore:
                 'ssid': '',
                 'password': '',
                 'version': '0',
-                'mode': 1,
-                'brightness': 100,
                 'error': 1,
                 'state': 0
             }
@@ -59,8 +48,6 @@ class Restore:
         self.wifi_ssid = data.get('ssid', '')
         self.wifi_password = data.get('password', '')
         self.version = data.get('version', '0')
-        self.temp_mode = data.get('mode', 1)
-        self.brightness = data.get('brightness', 100)
         self.error = data.get('error', 1)
         self.state = data.get('state', 0)
 
@@ -71,8 +58,6 @@ class Restore:
             'ssid': self.wifi_ssid,
             'password': self.wifi_password,
             'version': self.version,
-            'mode': self.temp_mode,
-            'brightness': self.brightness,
             'error': self.error,
             'state': self.state
         }
@@ -86,50 +71,7 @@ class Restore:
         self.load_data()
 
 
-    def display_send(self, command):
-        self.display.write(command)
-        self.display.write(self.hexadecimal)
-        sleep(0.05)
-        response = self.display.read()
-        return response
-
-
-    def display_message(self, msg):
-        self.display_send(f'message.msg.txt="{msg}"')
-
-
-    def display_page(self, page):
-        self.display_send(f'page {page}')
-
-
-    def wifi_time_handler(self, timer):
-        if self.wlan.isconnected() and timer is not None:
-            self.display_send(f'clock.status.pic={self.wifi_state_time+1}')
-            self.display_send(f'nfc_tag_temp.status.pic={self.wifi_state_time+1}')
-            self.display_send(f'nfc_tag.status.pic={self.wifi_state_time+1}')
-            self.display_send(f'message.status.pic={self.wifi_state_time+1}')
-            self.display_send(f'settings.status.pic={self.wifi_state_time+1}')
-            self.display_send(f'temp_mode.status.pic={self.wifi_state_time+1}')
-            self.display_send(f'display.status.pic={self.wifi_state_time+1}')
-            self.wifi_state_time += 1
-            if self.wifi_state_time > 2:
-                self.wifi_state_time = 0
-        else:
-            self.wifi_state_time = 0
-            self.display_send('clock.status.pic=4')
-            self.display_send('nfc_tag_temp.status.pic=4')
-            self.display_send('nfc_tag.status.pic=4')
-            self.display_send('message.status.pic=4')
-            self.display_send('settings.status.pic=4')
-            self.display_send('temp_mode.status.pic=4')
-            self.display_send('display.status.pic=4')
-
-
     def update(self):
-        self.display_page('message')
-        self.display_message('업데이트를 재개합니다')
-        sleep(0.5)
-        self.display_message('업데이트 확인 중..')
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
         except Exception as e:
@@ -140,7 +82,6 @@ class Restore:
 
         self.save_data('error', 1)
         
-        self.display_message(f'{new_version} 업데이트 중..')
         response = None
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
@@ -165,11 +106,15 @@ class Restore:
         self.save_data('version', str(new_version))
         
         print('Update complete.')
-        self.display_message(f'{new_version} 업데이트 완료')
-        sleep(1)
-        self.display_message('기기를 재시작합니다')
         sleep(1)
         reset()
+
+
+    def wifi_handler(self, timer):
+        if self.wlan.isconnected():
+            self.wifi_led.value(1)
+        else:
+            self.wifi_led.value(0)
 
 
     def web_login_page(self, network_list):
@@ -191,20 +136,13 @@ class Restore:
         return html
 
 
-    def wifi_setting(self, is_wrong):
+    def wifi_setting(self):
         print(self.kindergarden_id, self.wifi_ssid, self.wifi_password)
         
         if self.wifi_ssid != '':
             return
         
         print('wifi setting..')
-        
-        if is_wrong:
-            self.display_message('와이파이를 확인하세요')
-        else:
-            self.display_message('와이파이를 설정하세요')
-        
-        self.display_page('message')
 
         self.wlan.active(False)
         self.ap.config(essid=self.ap_ssid, password=self.ap_password)
@@ -259,8 +197,6 @@ class Restore:
 
 
     def wifi_reset(self):
-        self.display_message('와이파이를 재설정합니다')
-        self.display_page('message')
         self.save_data('state', 2)
         reset()
 
@@ -268,9 +204,6 @@ class Restore:
     def wifi_connect(self):
         self.wlan.active(True)
         
-        self.display_message('와이파이 연결 중..')
-        self.display_page('message')
-
         self.wlan.connect(self.wifi_ssid, self.wifi_password)
         count = 0
         while self.wlan.isconnected() == False:
@@ -281,9 +214,7 @@ class Restore:
             count += 1
             sleep(3)
         
-        self.display_message('와이파이 연결 완료')
         print('Wi-fi connect success')
-        self.start_wifi_time_timer()
         
         print(self.wlan.isconnected())
         print(self.wlan.ifconfig())
@@ -294,18 +225,14 @@ class Restore:
 
 
     def wifi_init(self):
-        self.wifi_setting(is_wrong=False)
+        self.wifi_setting()
         while not self.wifi_connect():
             self.wifi_clear()
-            self.wifi_setting(is_wrong=True)
+            self.wifi_setting()
 
 
-    def start_wifi_time_timer(self):
-        self.wifi_time_timer.init(mode=Timer.PERIODIC, period=1000, callback=self.wifi_time_handler)
-
-
-    def stop_wifi_time_timer(self):
-        self.wifi_time_timer.deinit()
+    def start_wifi_timer(self):
+        self.wifi_timer.init(mode=Timer.PERIODIC, period=1000, callback=self.wifi_handler)
 
 
     def restore(self):

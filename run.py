@@ -19,8 +19,6 @@ class Run:
 
         self.rtc = RTC()
 
-        self.week_days = ['월', '화', '수', '목', '금', '토', '일']
-
         self.nfc = PN532Uart(1, tx=Pin(4), rx=Pin(5), debug=False)
         self.nfc.SAM_configuration()
 
@@ -29,28 +27,21 @@ class Run:
 
         self.player = Player()
 
-        self.is_displaying = False
-        self.sleep_limit = 180
-        self.sleep_time = 0
-        self.is_sleeping = False
+        self.wifi_led = Pin(17, Pin.OUT)
+
         self.is_setting = False
 
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
         self.version = '0'
         self.error = 0
-        self.brightness = 100
         self.state = 0    # 0: 정상  1: 와이파이 오류  2: 와이파이 재설정  3: 업데이트 완료
-
-        self.wifi_state_time = 0
 
         self.wlan = network.WLAN(network.STA_IF)
         self.ap = network.WLAN(network.AP_IF)
 
         self.datetime_timer = Timer()
         self.update_timer = Timer()
-        self.read_timer = Timer()
         self.wifi_timer = Timer()
-        self.wifi_time_timer = Timer()
 
         self.run()
 
@@ -162,11 +153,6 @@ class Run:
 
 
     def update(self):
-        self.display_message(f'현재 버전 {self.version}')
-        self.display_page('message')
-        sleep(0.5)
-        self.display_message('업데이트 확인 중..')
-
         response = None
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
@@ -178,13 +164,11 @@ class Run:
         response.close()
         if new_version == self.version:
             print(f'{self.version} is latest version.')
-            self.display_message(f'현재 최신 버전입니다')
             sleep(0.5)
             return
 
         self.save_data('error', 1)
 
-        self.display_message(f'{new_version} 업데이트 중..')
         response = None
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
@@ -211,16 +195,12 @@ class Run:
         self.save_data('version', str(new_version))
 
         print('Update complete.')
-        self.display_message(f'{new_version} 업데이트 완료')
-        sleep(1)
-        self.display_message('기기를 재시작합니다')
         sleep(1)
         reset()
 
 
     def update_handler(self, timer):
         self.update()
-        self.display_page('clock')
 
 
     def read_handler(self, timer):
@@ -317,20 +297,13 @@ class Run:
         return html
 
 
-    def wifi_setting(self, is_wrong):
+    def wifi_setting(self):
         print(self.kindergarden_id, self.wifi_ssid, self.wifi_password)
         
         if self.wifi_ssid != '':
             return
         
         print('wifi setting..')
-        
-        if is_wrong:
-            self.display_message('와이파이를 확인하세요')
-        else:
-            self.display_message('와이파이를 설정하세요')
-        
-        self.display_page('message')
 
         self.wlan.active(False)
         self.ap.config(essid=self.ap_ssid, password=self.ap_password)
@@ -381,7 +354,6 @@ class Run:
     def wifi_clear(self):
         print('Wi-fi reset...')
         self.wlan.disconnect()
-        self.wifi_time_handler(None)
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
         self.save_data('kindergarden_id', '')
         self.save_data('ssid', '')
@@ -389,8 +361,6 @@ class Run:
 
 
     def wifi_reset(self):
-        self.display_message('와이파이를 재설정합니다')
-        self.display_page('message')
         self.save_data('state', 2)
         reset()
 
@@ -398,9 +368,6 @@ class Run:
     def wifi_connect(self):
         self.wlan.active(True)
         
-        self.display_message('와이파이 연결 중..')
-        self.display_page('message')
-
         self.wlan.connect(self.wifi_ssid, self.wifi_password)
         count = 0
         while self.wlan.isconnected() == False:
@@ -411,9 +378,7 @@ class Run:
             count += 1
             sleep(3)
         
-        self.display_message('와이파이 연결 완료')
         print('Wi-fi connect success')
-        self.start_wifi_time_timer()
         
         print(self.wlan.isconnected())
         print(self.wlan.ifconfig())
@@ -424,7 +389,7 @@ class Run:
 
 
     def wifi_init(self):
-        self.wifi_setting(is_wrong=False)
+        self.wifi_setting()
         while not self.wifi_connect():
             self.wifi_clear()
             self.wifi_setting(is_wrong=True)
@@ -444,6 +409,7 @@ class Run:
         response.close()
 
 
+    async def post_nfc(self, nfc_id):
     async def post_nfc(self, nfc_id):
         year, month, day, wd_idx, hour, minute, second = self.rtc.datetime()[:7]
         print(type(hour))
@@ -474,34 +440,16 @@ class Run:
         if response is None:
             return
         result = response.json()
+        print(result)
         return response.json()
-
-
-    def sleep_mode(self):
-        self.is_sleeping = True
-        self.display_send('sleep=1')
-
-
-    def awake_mode(self):
-        self.is_sleeping = False
-        self.sleep_time = 0
-        self.display_send('sleep=0')
-
-
-    def start_datetime_timer(self):
-        self.datetime_timer.init(mode=Timer.PERIODIC, period=1000, callback=self.datetime_handler)
-
-
-    def stop_datetime_timer(self):
-        self.datetime_timer.deinit()
 
 
     def start_update_timer(self):
         self.update_timer.init(mode=Timer.PERIODIC, period=21600000, callback=self.update_handler)
 
 
-    def start_read_timer(self):
-        self.read_timer.init(mode=Timer.PERIODIC, period=10, callback=self.read_handler)
+    def start_wifi_timer(self):
+        self.wifi_timer.init(mode=Timer.PERIODIC, period=1000, callback=self.wifi_handler)
 
 
     def start_setting(self):
@@ -510,14 +458,6 @@ class Run:
 
     def stop_setting(self):
         self.is_setting = False
-
-
-    def start_wifi_time_timer(self):
-        self.wifi_time_timer.init(mode=Timer.PERIODIC, period=1000, callback=self.wifi_time_handler)
-
-
-    def stop_wifi_time_timer(self):
-        self.wifi_time_timer.deinit()
 
 
     def tag(self):
@@ -537,7 +477,6 @@ class Run:
                 continue
             print(nfc_data)
             self.player.play('/sounds/beep.wav')
-            self.awake_mode()
             self.nfc.release_targets()
             nfc_id = ''.join([hex(i)[2:] for i in nfc_data])
             self.display_message('정보 확인 중..')
@@ -551,7 +490,6 @@ class Run:
         if self.state == 0:
             self.player.play('/sounds/eobuba.wav')
 
-        self.awake_mode()
         if self.state == 1:
             self.wifi_clear()
             self.wifi_reset()
@@ -563,11 +501,7 @@ class Run:
 
         self.get_time()
 
-        self.start_datetime_timer()
         self.start_update_timer()
-        self.start_read_timer()
+        self.start_wifi_timer()
 
-        self.load_display_data()
-
-        self.display_page('clock')
         self.tag()
