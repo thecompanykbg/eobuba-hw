@@ -1,6 +1,6 @@
 from time import sleep
 import asyncio
-from machine import I2C, Pin, SoftI2C, SPI, PWM, Timer, RTC, UART, reset
+from machine import I2C, Pin, SPI, PWM, Timer, RTC, UART, reset
 
 import network
 import socket
@@ -8,7 +8,6 @@ import requests
 import json
 
 from pn532 import PN532Uart
-from mlx90614 import MLX90614_I2C
 from max98357 import Player
 
 
@@ -25,9 +24,6 @@ class Run:
         self.nfc = PN532Uart(1, tx=Pin(4), rx=Pin(5), debug=False)
         self.nfc.SAM_configuration()
 
-        self.temperature_i2c = SoftI2C(scl=1, sda=0, freq=100000)
-        self.temperature_sensor = MLX90614_I2C(self.temperature_i2c, 0x5A)
-
         self.hexadecimal = b'\xFF\xFF\xFF'
         self.display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=9600)
 
@@ -41,7 +37,6 @@ class Run:
 
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
         self.version = '0'
-        self.temp_mode = 1
         self.error = 0
         self.brightness = 100
         self.state = 0    # 0: 정상  1: 와이파이 오류  2: 와이파이 재설정  3: 업데이트 완료
@@ -71,7 +66,6 @@ class Run:
                 'ssid': '',
                 'password': '',
                 'version': '0',
-                'mode': 1,
                 'brightness': 100,
                 'error': 1,
                 'state': 0
@@ -84,7 +78,6 @@ class Run:
         self.wifi_ssid = data.get('ssid', '')
         self.wifi_password = data.get('password', '')
         self.version = data.get('version', '0')
-        self.temp_mode = data.get('mode', 1)
         self.brightness = data.get('brightness', 100)
         self.error = data.get('error', 1)
         self.state = data.get('state', 0)
@@ -96,7 +89,6 @@ class Run:
             'ssid': self.wifi_ssid,
             'password': self.wifi_password,
             'version': self.version,
-            'mode': self.temp_mode,
             'brightness': self.brightness,
             'error': self.error,
             'state': self.state
@@ -144,7 +136,7 @@ class Run:
             self.display_send('clock.colon.txt=":"')
 
 
-    def display_nfc(self, response, temperature=None):
+    def display_nfc(self, response):
         result_code = response['resultCode']
         if result_code < 0:
             self.display_message('등록되지 않은 카드입니다')
@@ -154,17 +146,12 @@ class Run:
             sleep(3)
         else:
             name, *_ = response['resultMsg'].split()
-            nfc_tag_page = 'nfc_tag'
-            if temperature is not None:
-                nfc_tag_page += '_temp'
-            self.display_send(f'{nfc_tag_page}.name.txt="{name}"')
-            if temperature is not None:
-                self.display_send(f'{nfc_tag_page}.temp.txt="{temperature}"')
+            self.display_send(f'nfc_tag.name.txt="{name}"')
             if result_code >= 3:
-                self.display_send(f'{nfc_tag_page}.state.txt="하원"')
+                self.display_send('nfc_tag.state.txt="하원"')
             else:
-                self.display_send(f'{nfc_tag_page}.state.txt="등원"')
-            self.display_page(nfc_tag_page)
+                self.display_send('nfc_tag.state.txt="등원"')
+            self.display_page('nfc_tag')
             if result_code == 1:
                 self.player.play('/sounds/arrive.wav')
             elif result_code == 3:
@@ -247,55 +234,28 @@ class Run:
             print('settings')
             self.display_page('settings')
             return
-        elif data == b'e\x04\x04\x01\xff\xff\xff':
+        elif data == b'e\x03\x04\x01\xff\xff\xff':
             print('update')
             self.update()
-        elif data == b'e\x04\x03\x01\xff\xff\xff':
+        elif data == b'e\x03\x03\x01\xff\xff\xff':
             print('wifi')
             self.wifi_clear()
             self.wifi_reset()
-        elif data == b'e\x04\x06\x01\xff\xff\xff':
-            print('temp_mode')
-            self.display_page('temp_mode')
-            return
-        elif data == b'e\x04\x07\x01\xff\xff\xff':
+        elif data == b'e\x03\x06\x01\xff\xff\xff':
             self.display_page('display')
             return
         elif data == b'e\x03\x02\x01\xff\xff\xff':
             print('back')
-        elif data == b'e\x05\x02\x01\xff\xff\xff':
-            print('back')
-        elif data == b'e\x06\x02\x01\xff\xff\xff':
+        elif data == b'e\x04\x02\x01\xff\xff\xff':
             brightness = int.from_bytes(self.display_send('get display.slider.val')[1:3], 'little', True)
             self.set_display_brightness(brightness)
             print('back')
-        elif data == b'e\x05\x03\x01\xff\xff\xff':
-            self.set_temp_mode(1)
-            return
-        elif data == b'e\x05\x04\x01\xff\xff\xff':
-            self.set_temp_mode(2)
-            return
-        elif data == b'e\x05\x06\x01\xff\xff\xff':
-            self.set_temp_mode(3)
-            return
         self.stop_setting()
         self.display_page('clock')
 
 
-    def set_temp_mode(self, mode):
-        self.temp_mode = mode
-        self.save_data('mode', mode)
-        print('set mode', mode)
-        self.display_send(f'temp_mode.mode1_btn.pic={10+(mode != 1)}')
-        self.display_send(f'temp_mode.mode2_btn.pic={12+(mode != 2)}')
-        self.display_send(f'temp_mode.mode3_btn.pic={14+(mode != 3)}')
-
-
     def load_display_data(self):
         self.display_send(f'display.slider.val={self.brightness}')
-        self.display_send(f'temp_mode.mode1_btn.pic={10+(self.temp_mode != 1)}')
-        self.display_send(f'temp_mode.mode2_btn.pic={12+(self.temp_mode != 2)}')
-        self.display_send(f'temp_mode.mode3_btn.pic={14+(self.temp_mode != 3)}')
 
 
     def set_display_brightness(self, brightness):
@@ -322,11 +282,9 @@ class Run:
     def wifi_time_handler(self, timer):
         if self.wlan.isconnected() and timer is not None:
             self.display_send(f'clock.status.pic={self.wifi_state_time+1}')
-            self.display_send(f'nfc_tag_temp.status.pic={self.wifi_state_time+1}')
             self.display_send(f'nfc_tag.status.pic={self.wifi_state_time+1}')
             self.display_send(f'message.status.pic={self.wifi_state_time+1}')
             self.display_send(f'settings.status.pic={self.wifi_state_time+1}')
-            self.display_send(f'temp_mode.status.pic={self.wifi_state_time+1}')
             self.display_send(f'display.status.pic={self.wifi_state_time+1}')
             self.wifi_state_time += 1
             if self.wifi_state_time > 2:
@@ -334,11 +292,9 @@ class Run:
         else:
             self.wifi_state_time = 0
             self.display_send('clock.status.pic=4')
-            self.display_send('nfc_tag_temp.status.pic=4')
             self.display_send('nfc_tag.status.pic=4')
             self.display_send('message.status.pic=4')
             self.display_send('settings.status.pic=4')
-            self.display_send('temp_mode.status.pic=4')
             self.display_send('display.status.pic=4')
 
 
@@ -474,17 +430,6 @@ class Run:
             self.wifi_setting(is_wrong=True)
 
 
-    def get_temperature(self):
-        amb_temp = obj_temp = -100
-        while amb_temp > 380 or amb_temp < -70:
-            amb_temp = self.temperature_sensor.get_temperature(0)
-        while obj_temp > 380 or obj_temp < -70:
-            obj_temp = self.temperature_sensor.get_temperature(1)
-        temp = obj_temp+3
-        print(obj_temp, amb_temp)
-        return f'{temp:.1f}'
-
-
     def get_time(self):
         response = None
         try:
@@ -499,7 +444,7 @@ class Run:
         response.close()
 
 
-    async def post_nfc(self, nfc_id, temperature=0):
+    async def post_nfc(self, nfc_id):
         year, month, day, wd_idx, hour, minute, second = self.rtc.datetime()[:7]
         print(type(hour))
         yy = self.zfill(f'{year}', '0', 4)
@@ -516,7 +461,6 @@ class Run:
             'version': self.version,
             'inout_type': '1' if hour < 12 else '2',
             'date_time': datetime,
-            'temperature': f'{temperature}',
             'result_type': '1'
         }
         print(data)
@@ -596,39 +540,10 @@ class Run:
             self.awake_mode()
             self.nfc.release_targets()
             nfc_id = ''.join([hex(i)[2:] for i in nfc_data])
-            if self.temp_mode == 1:
-                temperature = self.get_temperature()
-                self.display_message('정보 확인 중..')
-                self.display_page('message')
-                response = asyncio.run(self.post_nfc(nfc_id, temperature))
-                if float(temperature) > 37.5:
-                    self.display_message('체온이 높습니다')
-                    self.player.play('/sounds/temp_high.wav')
-                elif float(temperature) < 32:
-                    self.display_message('체온이 낮습니다')
-                    self.player.play('/sounds/temp_low.wav')
-                self.display_nfc(response, temperature)
-            elif self.temp_mode == 2:
-                self.display_message('체온을 측정해 주세요')
-                self.display_page('message')
-                sleep(2)
-                temperature = self.get_temperature()
-                if float(temperature) < 32:
-                    self.display_message('체온이 측정되지 않음')
-                    self.player.play('/sounds/not_measured.wav')
-                    self.display_message('카드를 다시 대주세요')
-                    self.player.play('/sounds/card_again.wav')
-                    self.display_page('clock')
-                    continue
-                self.display_message('정보 확인 중..')
-                self.display_page('message')
-                response = asyncio.run(self.post_nfc(nfc_id, temperature))
-                self.display_nfc(response, temperature)
-            else:
-                self.display_message('정보 확인 중..')
-                self.display_page('message')
-                response = asyncio.run(self.post_nfc(nfc_id))
-                self.display_nfc(response)
+            self.display_message('정보 확인 중..')
+            self.display_page('message')
+            response = asyncio.run(self.post_nfc(nfc_id))
+            self.display_nfc(response)
 
 
     def run(self):
