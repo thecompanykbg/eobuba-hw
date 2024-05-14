@@ -9,6 +9,10 @@ import json
 
 from pn532 import PN532Uart
 from max98357 import Player
+<<<<<<< HEAD
+=======
+from ble_nfc import BLENFC
+>>>>>>> 76b1565 (블루투스 데이터 송수신 기능 구현)
 
 
 class Run:
@@ -479,10 +483,16 @@ class Run:
             self.player.play('/sounds/beep.wav')
             self.nfc.release_targets()
             nfc_id = ''.join([hex(i)[2:] for i in nfc_data])
+<<<<<<< HEAD
             self.display_message('정보 확인 중..')
             self.display_page('message')
             response = asyncio.run(self.post_nfc(nfc_id))
             self.display_nfc(response)
+=======
+
+            if self.ble_nfc.is_connected():
+                self.ble_nfc.send(nfc_id)
+>>>>>>> 76b1565 (블루투스 데이터 송수신 기능 구현)
 
 
     def run(self):
