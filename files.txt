@@ -1,9 +1,2 @@
 run.py
-<<<<<<< HEAD
-pn532.py
-max98357.py
-wave.py
-chunk.py
-=======
 files.txt
->>>>>>> a8c0ed4 (restore.py 복구)
