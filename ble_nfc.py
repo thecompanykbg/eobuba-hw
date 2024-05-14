@@ -40,7 +40,7 @@ _UART_SERVICE = (
 
 
 class BLENFC:
-    def __init__(self, ble, name='Eobuba'):
+    def __init__(self, ble, name='EOBUBA'):
         self._ble = ble
         self._ble.active(True)
         self._ble.irq(self._irq)
@@ -53,7 +53,6 @@ class BLENFC:
 
     def _irq(self, event, data):
         # Track connections so we can send notifications.
-        print(event, data)
         if event == _IRQ_CENTRAL_CONNECT:
             conn_handle, _, _ = data
             print("New connection", conn_handle)

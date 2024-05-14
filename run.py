@@ -47,8 +47,11 @@ class Run:
         self.update_timer = Timer()
         self.wifi_timer = Timer()
 
+        self.temp_storage = []
+
         self.run()
 
+<<<<<<< HEAD
 
     def load_data(self):
         f = data = None
@@ -463,14 +466,15 @@ class Run:
     def stop_setting(self):
         self.is_setting = False
 
+=======
+>>>>>>> 3923cf1 (태그 데이터 저장 기능 추가)
 
     def tag(self):
         self.nfc.SAM_configuration()
 
         while True:
-            if self.is_setting:
-                continue
             nfc_data = None
+            self.check_temp_storage()
             try:
                 nfc_data = self.nfc.read_passive_target()
             except:
@@ -491,7 +495,9 @@ class Run:
 =======
 
             if self.ble_nfc.is_connected():
+                print('send', nfc_id)
                 self.ble_nfc.send(nfc_id)
+<<<<<<< HEAD
 >>>>>>> 76b1565 (블루투스 데이터 송수신 기능 구현)
 
 
@@ -514,4 +520,54 @@ class Run:
         self.start_update_timer()
         self.start_wifi_timer()
 
+=======
+            else:
+                print('save', nfc_id)
+                self.save_temp(nfc_id)
+
+
+    def load_temp(self):
+        f = data = None
+        try:
+            f = open('temp.txt', 'r')
+            data = eval(f.read())
+        except:
+            data = []
+            f = open('temp.txt', 'w')
+            f.write(str(data))
+            f.close()
+
+        self.temp_storage = data
+
+
+    def save_temp(self, data=None):
+        f = open('temp.txt', 'w')
+        if data:
+            self.temp_storage.append(data)
+        f.write(str(self.temp_storage))
+        f.close()
+
+
+    def check_temp_storage(self):
+        if not self.ble_nfc.is_connected():
+            return
+
+        done_count = 0
+        for temp in self.temp_storage:
+            if self.ble_nfc.is_connected():
+                print('send', temp)
+                self.ble_nfc.send(temp)
+                done_count += 1
+            else:
+                break
+        if done_count > 0:
+            self.temp_storage = self.temp_storage[done_count:]
+            self.save_temp()
+
+
+    def run(self):
+        self.power_led.value(1)
+        self.player.play('/sounds/eobuba.wav')
+        self.load_temp()
+>>>>>>> 3923cf1 (태그 데이터 저장 기능 추가)
         self.tag()
