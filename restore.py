@@ -1,5 +1,9 @@
 from time import sleep
+<<<<<<< HEAD
 from machine import Pin, UART, Timer, reset
+=======
+from machine import Pin, Timer, reset
+>>>>>>> a8c0ed4 (restore.py 복구)
 
 import network
 import socket
@@ -13,6 +17,7 @@ class Restore:
         self.ap_ssid = '\uc5b4\ubd80\ubc14 \uc124\uc815'
         self.ap_password = '12341234'
 
+<<<<<<< HEAD
         self.hexadecimal = b'\xFF\xFF\xFF'
         self.display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=9600)
 
@@ -25,11 +30,25 @@ class Restore:
         self.state = 0
 
         self.wifi_state_time = 0
+=======
+        self.ble_led = Pin(21, Pin.OUT)
+        self.wifi_led = Pin(17, Pin.OUT)
+
+        self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
+        self.version = '0'
+        self.mode = 0     # 0: 와이파이  1: 블루투스
+        self.error = 0
+        self.state = 0    # 0: 정상  1: 와이파이 오류  2: 와이파이 재설정  3: 업데이트 완료
+>>>>>>> a8c0ed4 (restore.py 복구)
 
         self.wlan = network.WLAN(network.STA_IF)
         self.ap = network.WLAN(network.AP_IF)
 
+<<<<<<< HEAD
         self.wifi_time_timer = Timer()
+=======
+        self.led_timer = Timer()
+>>>>>>> a8c0ed4 (restore.py 복구)
 
         self.restore()
 
@@ -45,19 +64,31 @@ class Restore:
                 'ssid': '',
                 'password': '',
                 'version': '0',
+<<<<<<< HEAD
                 'brightness': 100,
+=======
+                'mode': 0,
+>>>>>>> a8c0ed4 (restore.py 복구)
                 'error': 1,
                 'state': 0
             }
             f = open('data.txt', 'w')
             f.write(str(data))
             f.close()
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> a8c0ed4 (restore.py 복구)
         self.kindergarden_id = data.get('group_id', '')
         self.wifi_ssid = data.get('ssid', '')
         self.wifi_password = data.get('password', '')
         self.version = data.get('version', '0')
+<<<<<<< HEAD
         self.brightness = data.get('brightness', 100)
+=======
+        self.mode = data.get('mode', 0)
+>>>>>>> a8c0ed4 (restore.py 복구)
         self.error = data.get('error', 1)
         self.state = data.get('state', 0)
 
@@ -68,7 +99,11 @@ class Restore:
             'ssid': self.wifi_ssid,
             'password': self.wifi_password,
             'version': self.version,
+<<<<<<< HEAD
             'brightness': self.brightness,
+=======
+            'mode': self.mode,
+>>>>>>> a8c0ed4 (restore.py 복구)
             'error': self.error,
             'state': self.state
         }
@@ -82,6 +117,7 @@ class Restore:
         self.load_data()
 
 
+<<<<<<< HEAD
     def display_send(self, command):
         self.display.write(command)
         self.display.write(self.hexadecimal)
@@ -122,6 +158,9 @@ class Restore:
         self.display_message('업데이트를 재개합니다')
         sleep(0.5)
         self.display_message('업데이트 확인 중..')
+=======
+    def update(self):
+>>>>>>> a8c0ed4 (restore.py 복구)
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
         except Exception as e:
@@ -132,7 +171,10 @@ class Restore:
 
         self.save_data('error', 1)
         
+<<<<<<< HEAD
         self.display_message(f'{new_version} 업데이트 중..')
+=======
+>>>>>>> a8c0ed4 (restore.py 복구)
         response = None
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
@@ -157,10 +199,13 @@ class Restore:
         self.save_data('version', str(new_version))
         
         print('Update complete.')
+<<<<<<< HEAD
         self.display_message(f'{new_version} 업데이트 완료')
         sleep(1)
         self.display_message('기기를 재시작합니다')
         sleep(1)
+=======
+>>>>>>> a8c0ed4 (restore.py 복구)
         reset()
 
 
@@ -183,7 +228,11 @@ class Restore:
         return html
 
 
+<<<<<<< HEAD
     def wifi_setting(self, is_wrong):
+=======
+    def wifi_setting(self):
+>>>>>>> a8c0ed4 (restore.py 복구)
         print(self.kindergarden_id, self.wifi_ssid, self.wifi_password)
         
         if self.wifi_ssid != '':
@@ -191,6 +240,7 @@ class Restore:
         
         print('wifi setting..')
         
+<<<<<<< HEAD
         if is_wrong:
             self.display_message('와이파이를 확인하세요')
         else:
@@ -198,6 +248,8 @@ class Restore:
         
         self.display_page('message')
 
+=======
+>>>>>>> a8c0ed4 (restore.py 복구)
         self.wlan.active(False)
         self.ap.config(essid=self.ap_ssid, password=self.ap_password)
         self.ap.ifconfig()
@@ -235,7 +287,11 @@ class Restore:
         self.save_data('group_id', self.kindergarden_id)
         self.save_data('ssid', self.wifi_ssid)
         self.save_data('password', self.wifi_password)
+<<<<<<< HEAD
         
+=======
+
+>>>>>>> a8c0ed4 (restore.py 복구)
         self.ap.disconnect()
         sleep(0.5)
 
@@ -243,6 +299,7 @@ class Restore:
     def wifi_clear(self):
         print('Wi-fi reset...')
         self.wlan.disconnect()
+<<<<<<< HEAD
         self.wifi_time_handler(None)
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
         self.save_data('kindergarden_id', '')
@@ -253,6 +310,12 @@ class Restore:
     def wifi_reset(self):
         self.display_message('와이파이를 재설정합니다')
         self.display_page('message')
+=======
+        self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
+
+
+    def wifi_reset(self):
+>>>>>>> a8c0ed4 (restore.py 복구)
         self.save_data('state', 2)
         reset()
 
@@ -260,9 +323,12 @@ class Restore:
     def wifi_connect(self):
         self.wlan.active(True)
         
+<<<<<<< HEAD
         self.display_message('와이파이 연결 중..')
         self.display_page('message')
 
+=======
+>>>>>>> a8c0ed4 (restore.py 복구)
         self.wlan.connect(self.wifi_ssid, self.wifi_password)
         count = 0
         while self.wlan.isconnected() == False:
@@ -273,7 +339,10 @@ class Restore:
             count += 1
             sleep(3)
         
+<<<<<<< HEAD
         self.display_message('와이파이 연결 완료')
+=======
+>>>>>>> a8c0ed4 (restore.py 복구)
         print('Wi-fi connect success')
         self.start_wifi_time_timer()
         
@@ -292,12 +361,26 @@ class Restore:
             self.wifi_setting(is_wrong=True)
 
 
+<<<<<<< HEAD
     def start_wifi_time_timer(self):
         self.wifi_time_timer.init(mode=Timer.PERIODIC, period=1000, callback=self.wifi_time_handler)
 
 
     def stop_wifi_time_timer(self):
         self.wifi_time_timer.deinit()
+=======
+    def led_handler(self, timer):
+        if self.wlan.isconnected():
+            self.wifi_led.value(1)
+            self.ble_led.value(0)
+        else:
+            self.wifi_led.toggle()
+            self.ble_led.value(0)
+
+
+    def start_led_timer(self):
+        self.led_timer.init(mode=Timer.PERIODIC, period=1000, callback=self.led_handler)
+>>>>>>> a8c0ed4 (restore.py 복구)
 
 
     def restore(self):
