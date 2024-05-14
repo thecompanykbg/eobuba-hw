@@ -1,5 +1,4 @@
 from time import sleep, ticks_ms
-import asyncio
 from machine import Pin, Timer, RTC, reset
 import bluetooth
 
@@ -11,6 +10,7 @@ import json
 from pn532 import PN532Uart
 from max98357 import Player
 from ble_nfc import BLENFC
+from led import LED
 
 
 class Run:
@@ -26,8 +26,8 @@ class Run:
 
         self.player = Player()
 
-        self.ble_led = Pin(21, Pin.OUT)
-        self.wifi_led = Pin(17, Pin.OUT)
+        self.ble_led = LED(21)
+        self.wifi_led = LED(17)
         self.button = Pin(13, Pin.IN, Pin.PULL_UP)
 
         self.is_setting = False
@@ -157,18 +157,14 @@ class Run:
     def led_handler(self, timer):
         if self.mode == 0:
             if self.wlan.isconnected():
-                self.wifi_led.value(1)
-                self.ble_led.value(0)
+                self.wifi_led.on()
             else:
                 self.wifi_led.toggle()
-                self.ble_led.value(0)
         else:
             if self.ble_nfc.is_connected():
-                self.ble_led.value(1)
-                self.wifi_led.value(0)
+                self.ble_led.on()
             else:
                 self.ble_led.toggle()
-                self.wifi_led.value(0)
 
 
     def web_login_page(self, network_list):
@@ -367,12 +363,12 @@ class Run:
     def toggle_mode(self):
         if self.mode == 0:
             self.mode = 1
-            self.wifi_led.value(0)
-            self.ble_led.value(1)
+            self.wifi_led.off()
+            self.ble_led.on()
         else:
             self.mode = 0
-            self.ble_led.value(0)
-            self.wifi_led.value(1)
+            self.ble_led.off()
+            self.wifi_led.on()
         
         self.save_data('mode', self.mode)
 
@@ -413,6 +409,10 @@ class Run:
             if nfc_data == None:
                 continue
             print(nfc_data)
+            if self.mode == 0:
+                self.wifi_led.click()
+            else:
+                self.ble_led.click()
             self.player.play('/sounds/beep.wav')
             self.nfc.release_targets()
             nfc_id = ''.join([hex(i)[2:] for i in nfc_data])

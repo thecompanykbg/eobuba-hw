@@ -6,6 +6,8 @@ import socket
 import requests
 import json
 
+from led import LED
+
 
 class Restore:
 
@@ -13,8 +15,8 @@ class Restore:
         self.ap_ssid = '\uc5b4\ubd80\ubc14 \uc124\uc815'
         self.ap_password = '12341234'
 
-        self.ble_led = Pin(21, Pin.OUT)
-        self.wifi_led = Pin(17, Pin.OUT)
+        self.ble_led = LED(21)
+        self.wifi_led = LED(17)
 
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
         self.version = '0'
@@ -228,12 +230,16 @@ class Restore:
 
 
     def led_handler(self, timer):
-        if self.wlan.isconnected():
-            self.wifi_led.value(1)
-            self.ble_led.value(0)
+        if self.mode == 0:
+            if self.wlan.isconnected():
+                self.wifi_led.on()
+            else:
+                self.wifi_led.toggle()
         else:
-            self.wifi_led.toggle()
-            self.ble_led.value(0)
+            if self.ble_nfc.is_connected():
+                self.ble_led.on()
+            else:
+                self.ble_led.toggle()
 
 
     def start_led_timer(self):
