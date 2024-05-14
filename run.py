@@ -1,6 +1,11 @@
 from time import sleep, ticks_ms
+<<<<<<< HEAD
 import asyncio
 from machine import Pin, Timer, RTC, UART, reset
+=======
+from machine import Pin, Timer, RTC, reset
+import bluetooth
+>>>>>>> 0021c7a (머지 정리)
 
 import network
 import socket
@@ -25,9 +30,6 @@ class Run:
 
         self.nfc = PN532Uart(1, tx=Pin(4), rx=Pin(5), debug=False)
         self.nfc.SAM_configuration()
-
-        self.hexadecimal = b'\xFF\xFF\xFF'
-        self.display = UART(0, tx=Pin(12), rx=Pin(13), baudrate=9600)
 
         self.player = Player()
 
@@ -119,64 +121,6 @@ class Run:
         f.close()
         print('done')
         self.load_data()
-
-
-    def display_send(self, command):
-        self.display.write(command)
-        self.display.write(self.hexadecimal)
-        sleep(0.05)
-        response = self.display.read()
-        return response
-
-
-    def display_message(self, msg):
-        self.display_send(f'message.msg.txt="{msg}"')
-
-
-    def display_page(self, page):
-        self.display_send(f'page {page}')
-
-
-    def display_date(self, year, month, day, hour, minute, second, wd_idx):
-        yy = self.zfill(f'{year}', '0', 4)
-        MM = self.zfill(f'{month}', '0', 2)
-        dd = self.zfill(f'{day}', '0', 2)
-        hh = self.zfill(f'{hour}', '0', 2)
-        mm = self.zfill(f'{minute}', '0', 2)
-        ss = self.zfill(f'{second}', '0', 2)
-        wd = self.week_days[wd_idx]
-        self.display_send(f'clock.date.txt="{yy}년 {MM}월 {dd}일({wd})"')
-        self.display_send(f'clock.hour.txt="{hh}"')
-        self.display_send(f'clock.minute.txt="{mm}"')
-        if second%2:
-            self.display_send('clock.colon.txt=""')
-        else:
-            self.display_send('clock.colon.txt=":"')
-
-
-    def display_nfc(self, response):
-        result_code = response['resultCode']
-        if result_code < 0:
-            self.display_message('등록되지 않은 카드입니다')
-            self.display_page('message')
-            self.player.play('/sounds/not_registered.wav')
-            self.display_message(f'{response['nfc_sn']}')
-            sleep(3)
-        else:
-            name, *_ = response['resultMsg'].split()
-            self.display_send(f'nfc_tag.name.txt="{name}"')
-            if result_code >= 3:
-                self.display_send('nfc_tag.state.txt="하원"')
-            else:
-                self.display_send('nfc_tag.state.txt="등원"')
-            self.display_page('nfc_tag')
-            if result_code == 1:
-                self.player.play('/sounds/arrive.wav')
-            elif result_code == 3:
-                self.player.play('/sounds/leave.wav')
-            else:
-                self.player.play('/sounds/card_already.wav')
-        self.display_page('clock')
 
 
     def update(self):
@@ -273,36 +217,6 @@ class Run:
 
     def zfill(self, string, char, count):
         return (char*count+string)[-count:]
-
-
-    def datetime_handler(self, timer):
-        year, month, day, wd_idx, hour, minute, second = self.rtc.datetime()[:7]
-        if not self.is_displaying and self.sleep_time < self.sleep_limit:
-            self.sleep_time += 1
-        if not self.is_sleeping and self.sleep_time >= self.sleep_limit:
-            self.sleep_mode()
-        if self.is_displaying or self.is_sleeping:
-            return
-        self.display_date(year, month, day, hour, minute, second, wd_idx)
-
-
-    def wifi_time_handler(self, timer):
-        if self.wlan.isconnected() and timer is not None:
-            self.display_send(f'clock.status.pic={self.wifi_state_time+1}')
-            self.display_send(f'nfc_tag.status.pic={self.wifi_state_time+1}')
-            self.display_send(f'message.status.pic={self.wifi_state_time+1}')
-            self.display_send(f'settings.status.pic={self.wifi_state_time+1}')
-            self.display_send(f'display.status.pic={self.wifi_state_time+1}')
-            self.wifi_state_time += 1
-            if self.wifi_state_time > 2:
-                self.wifi_state_time = 0
-        else:
-            self.wifi_state_time = 0
-            self.display_send('clock.status.pic=4')
-            self.display_send('nfc_tag.status.pic=4')
-            self.display_send('message.status.pic=4')
-            self.display_send('settings.status.pic=4')
-            self.display_send('display.status.pic=4')
 
 
     def web_login_page(self, network_list):

@@ -39,7 +39,10 @@ class Restore:
         self.mode = 0     # 0: 와이파이  1: 블루투스
         self.error = 0
         self.state = 0    # 0: 정상  1: 와이파이 오류  2: 와이파이 재설정  3: 업데이트 완료
+<<<<<<< HEAD
 >>>>>>> a8c0ed4 (restore.py 복구)
+=======
+>>>>>>> 0021c7a (머지 정리)
 
         self.wlan = network.WLAN(network.STA_IF)
         self.ap = network.WLAN(network.AP_IF)
@@ -118,6 +121,7 @@ class Restore:
 
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     def display_send(self, command):
         self.display.write(command)
         self.display.write(self.hexadecimal)
@@ -161,6 +165,9 @@ class Restore:
 =======
     def update(self):
 >>>>>>> a8c0ed4 (restore.py 복구)
+=======
+    def update(self):
+>>>>>>> 0021c7a (머지 정리)
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
         except Exception as e:
@@ -172,9 +179,12 @@ class Restore:
         self.save_data('error', 1)
         
 <<<<<<< HEAD
+<<<<<<< HEAD
         self.display_message(f'{new_version} 업데이트 중..')
 =======
 >>>>>>> a8c0ed4 (restore.py 복구)
+=======
+>>>>>>> 0021c7a (머지 정리)
         response = None
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
@@ -229,10 +239,14 @@ class Restore:
 
 
 <<<<<<< HEAD
+<<<<<<< HEAD
     def wifi_setting(self, is_wrong):
 =======
     def wifi_setting(self):
 >>>>>>> a8c0ed4 (restore.py 복구)
+=======
+    def wifi_setting(self):
+>>>>>>> 0021c7a (머지 정리)
         print(self.kindergarden_id, self.wifi_ssid, self.wifi_password)
         
         if self.wifi_ssid != '':
@@ -308,6 +322,7 @@ class Restore:
 
 
     def wifi_reset(self):
+<<<<<<< HEAD
         self.display_message('와이파이를 재설정합니다')
         self.display_page('message')
 =======
@@ -316,6 +331,8 @@ class Restore:
 
     def wifi_reset(self):
 >>>>>>> a8c0ed4 (restore.py 복구)
+=======
+>>>>>>> 0021c7a (머지 정리)
         self.save_data('state', 2)
         reset()
 
@@ -324,11 +341,14 @@ class Restore:
         self.wlan.active(True)
         
 <<<<<<< HEAD
+<<<<<<< HEAD
         self.display_message('와이파이 연결 중..')
         self.display_page('message')
 
 =======
 >>>>>>> a8c0ed4 (restore.py 복구)
+=======
+>>>>>>> 0021c7a (머지 정리)
         self.wlan.connect(self.wifi_ssid, self.wifi_password)
         count = 0
         while self.wlan.isconnected() == False:
@@ -340,9 +360,12 @@ class Restore:
             sleep(3)
         
 <<<<<<< HEAD
+<<<<<<< HEAD
         self.display_message('와이파이 연결 완료')
 =======
 >>>>>>> a8c0ed4 (restore.py 복구)
+=======
+>>>>>>> 0021c7a (머지 정리)
         print('Wi-fi connect success')
         self.start_wifi_time_timer()
         
