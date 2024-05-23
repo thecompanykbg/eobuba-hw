@@ -4,24 +4,41 @@ from time import sleep
 
 class LED:
 
-    def __init__(self, pin_num):
-        self.led = PWM(Pin(pin_num, Pin.OUT))
-        self.led.freq(5000)
+    def __init__(self, pin_r, pin_g, pin_b):
+        self.led_r = PWM(Pin(pin_r, Pin.OUT))
+        self.led_g = PWM(Pin(pin_g, Pin.OUT))
+        self.led_b = PWM(Pin(pin_b, Pin.OUT))
+        self.led_r.freq(5000)
+        self.led_g.freq(5000)
+        self.led_b.freq(5000)
+        self.r = 0
+        self.g = 0
+        self.b = 0
         self.state = False
+
+
+    def set_rgb(self, r, g, b):
+        self.r = r
+        self.g = g
+        self.b = b
 
 
     def on(self):
         if not self.state:
-            for i in range(0, 65536, 100):
-                self.led.duty_u16(i)
+            for i in range(256):
+                self.led_r.duty_u16(self.r*i)
+                self.led_g.duty_u16(self.g*i)
+                self.led_b.duty_u16(self.b*i)
                 sleep(0.001)
             self.state = True
 
 
     def off(self):
         if self.state:
-            for i in range(65535, -1, -100):
-                self.led.duty_u16(i)
+            for i in range(255, -1, -1):
+                self.led_r.duty_u16(self.r*i)
+                self.led_g.duty_u16(self.g*i)
+                self.led_b.duty_u16(self.b*i)
                 sleep(0.001)
             self.state = False
 
@@ -34,7 +51,11 @@ class LED:
 
 
     def click(self):
-        self.led.duty_u16(0)
+        self.led_r.duty_u16(0)
+        self.led_g.duty_u16(0)
+        self.led_b.duty_u16(0)
         sleep(0.1)
-        self.led.duty_u16(65535)
+        self.led_r.duty_u16(self.r*256)
+        self.led_g.duty_u16(self.g*256)
+        self.led_b.duty_u16(self.b*256)
         self.state = True
