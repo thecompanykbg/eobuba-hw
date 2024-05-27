@@ -16,7 +16,7 @@ from led import LED
 class Run:
 
     def __init__(self):
-        self.ap_ssid = '\uc5b4\ubd80\ubc14 \uc124\uc815'
+        self.ap_ssid = 'TCS'
         self.ap_password = '12341234'
 
         self.rtc = RTC()

@@ -40,7 +40,7 @@ _UART_SERVICE = (
 
 
 class BLENFC:
-    def __init__(self, ble, name='EOBUBA'):
+    def __init__(self, ble, name='TCS'):
         self._ble = ble
         self._ble.active(True)
         self._ble.irq(self._irq)
