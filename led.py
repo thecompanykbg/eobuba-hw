@@ -18,9 +18,12 @@ class LED:
 
 
     def set_rgb(self, r, g, b):
+        if r == self.r and g == self.g and b == self.b:
+            return
         self.r = r
         self.g = g
         self.b = b
+        self.off()
 
 
     def on(self):

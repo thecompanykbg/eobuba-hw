@@ -9,7 +9,6 @@ import json
 
 from pn532 import PN532Uart
 from max98357 import Player
-from ble_nfc import BLENFC
 from led import LED
 
 
@@ -31,16 +30,8 @@ class Run:
 
         self.is_setting = False
 
-        self.ble = bluetooth.BLE()
-        self.ble_nfc = BLENFC(self.ble)
-
-        self.temp_storage = []
-
-        self.is_setting = False
-
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
         self.version = '0'
-        self.mode = 0     # 0: 와이파이  1: 블루투스
         self.error = 0
         self.state = 0    # 0: 정상  1: 와이파이 오류  2: 와이파이 재설정  3: 업데이트 완료
 
@@ -65,7 +56,6 @@ class Run:
                 'ssid': '',
                 'password': '',
                 'version': '0',
-                'mode': 0,
                 'error': 1,
                 'state': 0
             }
@@ -77,7 +67,6 @@ class Run:
         self.wifi_ssid = data.get('ssid', '')
         self.wifi_password = data.get('password', '')
         self.version = data.get('version', '0')
-        self.mode = data.get('mode', 0)
         self.error = data.get('error', 1)
         self.state = data.get('state', 0)
 
@@ -88,7 +77,6 @@ class Run:
             'ssid': self.wifi_ssid,
             'password': self.wifi_password,
             'version': self.version,
-            'mode': self.mode,
             'error': self.error,
             'state': self.state
         }
@@ -154,15 +142,12 @@ class Run:
 
 
     def led_handler(self, timer):
-        if self.mode == 0:
+        if self.is_setting:
+            self.led.set_rgb(255, 0, 0)
+            self.led.toggle()
+        else:
             self.led.set_rgb(0, 255, 0)
             if self.wlan.isconnected():
-                self.led.on()
-            else:
-                self.led.toggle()
-        else:
-            self.led.set_rgb(0, 0, 255)
-            if self.ble_nfc.is_connected():
                 self.led.on()
             else:
                 self.led.toggle()
@@ -259,8 +244,8 @@ class Run:
         count = 0
         while self.wlan.isconnected() == False:
             if count >= 5:
-                print('Wi-fi connect fail')
-                return False
+                self.save_data('state', 2)
+                reset()
             print('Wi-fi connecting..')
             count += 1
             sleep(3)
@@ -356,24 +341,6 @@ class Run:
                 self.save_data('password', self.wifi_password)
                 reset()
                 return
-        else:
-            self.toggle_mode()
-            print('change mode', self.mode)
-
-
-    def toggle_mode(self):
-        if self.mode == 0:
-            self.mode = 1
-            self.led.off()
-            self.led.set_rgb(0, 0, 255)
-            self.led.on()
-        else:
-            self.mode = 0
-            self.led.off()
-            self.led.set_rgb(0, 255, 0)
-            self.led.on()
-        
-        self.save_data('mode', self.mode)
 
 
     def button_handler(self, timer):
@@ -403,7 +370,6 @@ class Run:
             nfc_data = None
             if not self.button.value():
                 self.start_setting()
-            self.check_temp_storage()
             self.save_data('state', 0)
             try:
                 nfc_data = self.nfc.read_passive_target()
@@ -418,61 +384,9 @@ class Run:
             self.nfc.release_targets()
             nfc_id = ''.join([hex(i)[2:] for i in nfc_data])
 
-            if self.mode == 0:
-                if self.wlan.isconnected():
-                    print('wifi send', nfc_id)
-                    self.post_nfc(nfc_id)
-                else:
-                    print('save', nfc_id)
-                    self.save_temp(nfc_id)   
-            else:
-                if self.ble_nfc.is_connected():
-                    print('bluetooth send', nfc_id)
-                    self.ble_nfc.send(nfc_id)
-                else:
-                    print('save', nfc_id)
-                    self.save_temp(nfc_id)
-
-
-    def load_temp(self):
-        f = data = None
-        try:
-            f = open('temp.txt', 'r')
-            data = eval(f.read())
-        except:
-            data = []
-            f = open('temp.txt', 'w')
-            f.write(str(data))
-            f.close()
-
-        self.temp_storage = data
-
-
-    def save_temp(self, data=None):
-        f = open('temp.txt', 'w')
-        if data:
-            self.temp_storage.append(data)
-        f.write(str(self.temp_storage))
-        f.close()
-
-
-    def check_temp_storage(self):
-        if self.mode == 0:
-            if self.wlan.isconnected() and self.temp_storage:
-                self.post_nfc(self.temp_storage.pop(0), is_sound=False)
-            self.save_temp()
-            return
-        done_count = 0
-        for temp in self.temp_storage:
-            if self.ble_nfc.is_connected():
-                print('bluetooth send', temp)
-                self.ble_nfc.send(temp)
-                done_count += 1
-            else:
-                break
-        if done_count > 0:
-            self.temp_storage = self.temp_storage[done_count:]
-            self.save_temp()
+            if self.wlan.isconnected():
+                print('wifi send', nfc_id)
+                self.post_nfc(nfc_id)
 
 
     def run(self):
@@ -482,20 +396,17 @@ class Run:
 
         self.start_led_timer()
         self.start_button_timer()
-        if self.mode == 0:
+        if self.state == 1:
             self.is_setting = True
-            if self.state == 1:
-                self.wifi_clear()
-                self.wifi_reset()
-            else:
-                self.wifi_init()
+            self.wifi_clear()
+            self.wifi_reset()
             self.is_setting = False
+        else:
+            self.wifi_init()
 
-            if self.state == 0 or self.state == 1:
-                self.update()
-            self.get_time()
-            self.start_update_timer()
-
-        self.load_temp()
+        if self.state == 0 or self.state == 1:
+            self.update()
+        self.get_time()
+        self.start_update_timer()
 
         self.tag()

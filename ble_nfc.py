@@ -9,6 +9,8 @@ import bluetooth
 import random
 import struct
 import time
+import json
+
 from ble_advertising import advertising_payload
 from max98357 import Player
 
@@ -24,18 +26,72 @@ _FLAG_WRITE_NO_RESPONSE = const(0x0004)
 _FLAG_WRITE = const(0x0008)
 _FLAG_NOTIFY = const(0x0010)
 
-_UART_UUID = bluetooth.UUID("6E400001-B5A3-F393-E0A9-E50E24DCCA9E")
-_UART_TX = (
-    bluetooth.UUID("6E400003-B5A3-F393-E0A9-E50E24DCCA9E"),
+_ELECTRONIC_ATTENDANCE_UUID = bluetooth.UUID("eab53e40-7d9a-4902-a1e7-630fda98d980")
+
+_NFC_TAG_ID_SYN = (
+    bluetooth.UUID("eab53e41-7d9a-4902-a1e7-630fda98d980"),
     _FLAG_READ | _FLAG_NOTIFY,
 )
-_UART_RX = (
-    bluetooth.UUID("6E400002-B5A3-F393-E0A9-E50E24DCCA9E"),
-    _FLAG_WRITE | _FLAG_WRITE_NO_RESPONSE,
+_NFC_TAG_ID_ACK = (
+    bluetooth.UUID("eab53e42-7d9a-4902-a1e7-630fda98d980"),
+    _FLAG_WRITE,
 )
-_UART_SERVICE = (
-    _UART_UUID,
-    (_UART_TX, _UART_RX),
+_KINDERGARDEN_ID_SYN = (
+    bluetooth.UUID("eab53e43-7d9a-4902-a1e7-630fda98d980"),
+    _FLAG_WRITE,
+)
+_KINDERGARDEN_ID_ACK = (
+    bluetooth.UUID("eab53e44-7d9a-4902-a1e7-630fda98d980"),
+    _FLAG_READ | _FLAG_NOTIFY,
+)
+_WIFI_SSID_SYN = (
+    bluetooth.UUID("eab53e45-7d9a-4902-a1e7-630fda98d980"),
+    _FLAG_WRITE,
+)
+_WIFI_SSID_ACK = (
+    bluetooth.UUID("eab53e46-7d9a-4902-a1e7-630fda98d980"),
+    _FLAG_READ | _FLAG_NOTIFY,
+)
+_WIFI_PASSWORD_SYN = (
+    bluetooth.UUID("eab53e47-7d9a-4902-a1e7-630fda98d980"),
+    _FLAG_WRITE,
+)
+_WIFI_PASSWORD_ACK = (
+    bluetooth.UUID("eab53e48-7d9a-4902-a1e7-630fda98d980"),
+    _FLAG_READ | _FLAG_NOTIFY,
+)
+_RESULT_CODE_SYN = (
+    bluetooth.UUID("eab53e49-7d9a-4902-a1e7-630fda98d980"),
+    _FLAG_WRITE,
+)
+_RESULT_CODE_ACK = (
+    bluetooth.UUID("eab53e50-7d9a-4902-a1e7-630fda98d980"),
+    _FLAG_READ | _FLAG_NOTIFY,
+)
+_STATE_CODE_SYN = (
+    bluetooth.UUID("eab53e51-7d9a-4902-a1e7-630fda98d980"),
+    _FLAG_READ | _FLAG_NOTIFY,
+)
+_STATE_CODE_ACK = (
+    bluetooth.UUID("eab53e52-7d9a-4902-a1e7-630fda98d980"),
+    _FLAG_WRITE,
+)
+_ELECTRONIC_ATTENDANCE_SERVICE = (
+    _ELECTRONIC_ATTENDANCE_UUID,
+    (
+        _NFC_TAG_ID_SYN,
+        _NFC_TAG_ID_ACK,
+        _KINDERGARDEN_ID_SYN,
+        _KINDERGARDEN_ID_ACK,
+        _WIFI_SSID_SYN,
+        _WIFI_SSID_ACK,
+        _WIFI_PASSWORD_SYN,
+        _WIFI_PASSWORD_ACK,
+        _RESULT_CODE_SYN,
+        _RESULT_CODE_ACK,
+        _STATE_CODE_SYN,
+        _STATE_CODE_ACK
+    ),
 )
 
 
@@ -44,10 +100,22 @@ class BLENFC:
         self._ble = ble
         self._ble.active(True)
         self._ble.irq(self._irq)
-        ((self._handle_tx, self._handle_rx),) = self._ble.gatts_register_services((_UART_SERVICE,))
+        ((
+            self._handle_nfc_tag_id_syn,
+            self._handle_nfc_tag_id_ack,
+            self._handle_kindergarden_id_syn,
+            self._handle_kindergarden_id_ack,
+            self._handle_wifi_ssid_syn,
+            self._handle_wifi_ssid_ack,
+            self._handle_wifi_password_syn,
+            self._handle_wifi_password_ack,
+            self._handle_result_code_syn,
+            self._handle_result_code_ack,
+            self._handle_state_code_syn,
+            self._handle_state_code_ack
+        ),) = self._ble.gatts_register_services((_ELECTRONIC_ATTENDANCE_SERVICE,))
         self._connections = set()
-        self._write_callback = self.receive
-        self._payload = advertising_payload(name=name, services=[_UART_UUID])
+        self._payload = advertising_payload(name=name, services=[_ELECTRONIC_ATTENDANCE_UUID])
         self._advertise()
         self.player = Player()
 
@@ -57,6 +125,7 @@ class BLENFC:
             conn_handle, _, _ = data
             print("New connection", conn_handle)
             self._connections.add(conn_handle)
+            self.send_state_code('SETTING')
         elif event == _IRQ_CENTRAL_DISCONNECT:
             conn_handle, _, _ = data
             print("Disconnected", conn_handle)
@@ -66,25 +135,48 @@ class BLENFC:
         elif event == _IRQ_GATTS_WRITE:
             conn_handle, value_handle = data
             value = self._ble.gatts_read(value_handle)
-            if value_handle == self._handle_rx and self._write_callback:
-                self._write_callback(value)
+            self.receive(value, value_handle)
 
-    def send(self, data):
+    def send_nfc_tag_id(self, data):
         for conn_handle in self._connections:
-            self._ble.gatts_notify(conn_handle, self._handle_tx, data)
+            self._ble.gatts_notify(conn_handle, self._handle_nfc_tag_id_syn, data)
 
-    def receive(self, data):
+    def send_state_code(self, data):
+        for conn_handle in self._connections:
+            self._ble.gatts_notify(conn_handle, self._handle_state_code_syn, data)
+
+    def receive(self, data, value_handle):
         print(data)
-        if data == b'arrive':
-            self.player.play('/sounds/arrive.wav')
-        elif data == b'leave':
-            self.player.play('/sounds/leave.wav')
-        elif data == b'card_again':
-            self.player.play('/sounds/card_again.wav')
-        elif data == b'card_already':
-            self.player.play('/sounds/card_already.wav')
-        elif data == b'not_registered':
-            self.player.play('/sounds/not_registered.wav')
+        if value_handle == self._handle_kindergarden_id_syn:
+            print('kindergarden_id', data)
+            for conn_handle in self._connections:
+                self._ble.gatts_notify(conn_handle, self._handle_kindergarden_id_ack, data)
+        elif value_handle == self._handle_wifi_ssid_syn:
+            print('ssid', data)
+            for conn_handle in self._connections:
+                self._ble.gatts_notify(conn_handle, self._handle_wifi_ssid_ack, data)
+        elif value_handle == self._handle_wifi_password_syn:
+            print('password', data)
+            for conn_handle in self._connections:
+                self._ble.gatts_notify(conn_handle, self._handle_wifi_password_ack, data)
+        elif value_handle == self._handle_wifi_password_syn:
+            print('password', data)
+            for conn_handle in self._connections:
+                self._ble.gatts_notify(conn_handle, self._handle_wifi_password_ack, data)
+        elif value_handle == self._handle_result_code_syn:
+            print('resultcode', data)
+            if data == 1:
+                self.player.play('/sounds/arrive.wav')
+            elif data == 3:
+                self.player.play('/sounds/leave.wav')
+            elif data in [2, 4]:
+                self.player.play('/sounds/card_already.wav')
+            elif data == -1:
+                self.player.play('/sounds/not_registered.wav')
+        elif value_handle == self._handle_nfc_tag_id_ack:
+            print('nfc tag id ack', data)
+        elif value_handle == self._handle_state_code_ack:
+            print('state code ack', data)
 
     def is_connected(self):
         return len(self._connections) > 0
@@ -92,6 +184,3 @@ class BLENFC:
     def _advertise(self, interval_us=500000):
         print("Starting advertising")
         self._ble.gap_advertise(interval_us, adv_data=self._payload)
-
-    def on_write(self, callback):
-        self._write_callback = callback
