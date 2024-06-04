@@ -6,6 +6,7 @@ import network
 import socket
 import requests
 import json
+import ubinascii
 
 from pn532 import PN532Uart
 from max98357 import Player
@@ -15,9 +16,6 @@ from led import LED
 class Run:
 
     def __init__(self):
-        self.ap_ssid = 'TCS'
-        self.ap_password = '12341234'
-
         self.rtc = RTC()
 
         self.nfc = PN532Uart(1, tx=Pin(4), rx=Pin(5), debug=False)
@@ -39,6 +37,11 @@ class Run:
 
         self.wlan = network.WLAN(network.STA_IF)
         self.ap = network.WLAN(network.AP_IF)
+
+        self.wlan.active(True)
+        self.ap_ssid = 'TCS-'+''.join(ubinascii.hexlify(self.wlan.config('mac'), ':').decode().split(':'))[:4].upper()
+        self.ap_password = '12341234'
+        self.wlan.active(False)
 
         self.update_timer = Timer()
         self.led_timer = Timer()
@@ -67,7 +70,6 @@ class Run:
         self.kindergarden_id = data.get('group_id', '')
         self.wifi_ssid = data.get('ssid', '')
         self.wifi_password = data.get('password', '')
-        self.version = data.get('version', '0')
         self.error = data.get('error', 1)
         self.state = data.get('state', 0)
 
@@ -76,7 +78,7 @@ class Run:
         f = version = None
         try:
             f = open('version.txt', 'r')
-            version = eval(f.read())
+            version = f.read()
         except:
             version = '0'
             f = open('version.txt', 'w')
@@ -129,6 +131,7 @@ class Run:
         if new_version == self.version:
             print(f'{self.version} is latest version.')
             sleep(0.5)
+            self.is_updating = False
             return
 
         self.save_data('error', 1)
@@ -405,6 +408,7 @@ class Run:
 
     def run(self):
         self.load_data()
+        self.load_version()
         if self.state == 0:
             self.player.play('/sounds/eobuba.wav')
         

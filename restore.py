@@ -5,6 +5,7 @@ import network
 import socket
 import requests
 import json
+import ubinascii
 
 from max98357 import Player
 from led import LED
@@ -13,9 +14,6 @@ from led import LED
 class Restore:
 
     def __init__(self):
-        self.ap_ssid = 'TCS'
-        self.ap_password = '12341234'
-
         self.led = LED(18, 19, 20)
 
         self.player = Player()
@@ -27,6 +25,11 @@ class Restore:
 
         self.wlan = network.WLAN(network.STA_IF)
         self.ap = network.WLAN(network.AP_IF)
+
+        self.wlan.active(True)
+        self.ap_ssid = 'TCS-'+''.join(ubinascii.hexlify(self.wlan.config('mac'), ':').decode().split(':'))[:4].upper()
+        self.ap_password = '12341234'
+        self.wlan.active(False)
 
         self.led_timer = Timer()
 
@@ -53,23 +56,8 @@ class Restore:
         self.kindergarden_id = data.get('group_id', '')
         self.wifi_ssid = data.get('ssid', '')
         self.wifi_password = data.get('password', '')
-        self.version = data.get('version', '0')
         self.error = data.get('error', 1)
         self.state = data.get('state', 0)
-
-
-    def load_version(self):
-        f = version = None
-        try:
-            f = open('version.txt', 'r')
-            version = eval(f.read())
-        except:
-            version = '0'
-            f = open('version.txt', 'w')
-            f.write(version)
-            f.close()
-
-        self.version = version
 
 
     def save_data(self, key, value):
@@ -96,25 +84,10 @@ class Restore:
         f.write(new_version)
         f.close()
         print('done')
-        self.load_version()
 
 
     def update(self):
         self.player.play('/sounds/updating.wav')
-
-        response = None
-        try:
-            response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
-        except Exception as e:
-            self.save_data('state', 1)
-            reset()
-        print(response.text, self.version)
-        new_version = response.text
-        response.close()
-        if new_version == self.version:
-            print(f'{self.version} is latest version.')
-            sleep(0.5)
-            return
 
         self.save_data('error', 1)
 
