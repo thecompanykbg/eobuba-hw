@@ -34,6 +34,7 @@ class Run:
         self.version = '0'
         self.error = 0
         self.state = 0    # 0: 정상  1: 와이파이 오류  2: 와이파이 재설정  3: 업데이트 완료
+        self.button_count = 0
 
         self.wlan = network.WLAN(network.STA_IF)
         self.ap = network.WLAN(network.AP_IF)
@@ -142,7 +143,7 @@ class Run:
 
 
     def led_handler(self, timer):
-        if self.is_setting:
+        if self.state == 2:
             self.led.set_rgb(255, 0, 0)
             self.led.toggle()
         else:
@@ -175,9 +176,10 @@ class Run:
     def wifi_setting(self):
         print(self.kindergarden_id, self.wifi_ssid, self.wifi_password)
         
-        if self.wifi_ssid != '':
+        if self.state != 2:
             return
-        
+
+        self.is_setting = True
         print('wifi setting..')
 
         self.wlan.active(False)
@@ -199,7 +201,7 @@ class Run:
         s.bind(('', 80))
         s.listen(5)
 
-        while self.wifi_ssid == '':
+        while self.state == 2:
             conn, addr = s.accept()
             req = str(conn.recv(1024))
             response = self.web_login_page(network_list)
@@ -213,28 +215,15 @@ class Run:
                 self.wifi_password = req[password_idx+10:end_idx]
                 print(self.kindergarden_id, self.wifi_ssid, self.wifi_password)
                 response = self.web_done_page()
+                self.save_data('state', 1)
             conn.send(response)
             conn.close()
         s.close()
         sleep(0.5)
 
-        self.save_data('group_id', self.kindergarden_id)
-        self.save_data('ssid', self.wifi_ssid)
-        self.save_data('password', self.wifi_password)
-
         self.ap.disconnect()
+        self.is_setting = False
         sleep(0.5)
-
-
-    def wifi_clear(self):
-        print('Wi-fi reset...')
-        self.wlan.disconnect()
-        self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
-
-
-    def wifi_reset(self):
-        self.save_data('state', 2)
-        reset()
 
 
     def wifi_connect(self):
@@ -242,15 +231,17 @@ class Run:
         
         self.wlan.connect(self.wifi_ssid, self.wifi_password)
         count = 0
+        self.player.play('/sounds/connecting_wifi.wav')
         while self.wlan.isconnected() == False:
             if count >= 5:
-                self.save_data('state', 2)
+                self.save_data('state', 1)
                 reset()
             print('Wi-fi connecting..')
             count += 1
             sleep(3)
         
         print('Wi-fi connect success')
+        self.player.play('/sounds/connected_wifi.wav')
         
         print(self.wlan.isconnected())
         print(self.wlan.ifconfig())
@@ -263,7 +254,6 @@ class Run:
     def wifi_init(self):
         self.wifi_setting()
         while not self.wifi_connect():
-            self.wifi_clear()
             self.wifi_setting()
 
 
@@ -328,27 +318,24 @@ class Run:
             self.player.play('/sounds/card_already.wav')
 
 
-    def start_setting(self):
-        current_time = ticks_ms()
-        limit_time = current_time+3000
-        while ticks_ms() < limit_time:
-            if self.button.value():
-                self.is_setting = True
-                self.wifi_clear()
-                self.wifi_init()
-                self.save_data('kindergarden_id', self.kindergarden_id)
-                self.save_data('ssid', self.wifi_ssid)
-                self.save_data('password', self.wifi_password)
-                reset()
-                return
-
-
     def button_handler(self, timer):
-        if self.is_setting:
+        if self.state == 2:
             if not self.button.value():
                 print('reset')
+                self.save_data('state', 1)
+                self.led.off()
                 reset()
-                return
+        else:
+            if self.button.value():
+                self.button_count = 0
+                print('count', self.button_count)
+            else:
+                self.button_count += 1
+                if self.button_count >= 3:
+                    print('setting')
+                    self.save_data('state', 2)
+                    self.led.off()
+                    reset()
 
 
     def start_update_timer(self):
@@ -368,8 +355,6 @@ class Run:
 
         while True:
             nfc_data = None
-            if not self.button.value():
-                self.start_setting()
             self.save_data('state', 0)
             try:
                 nfc_data = self.nfc.read_passive_target()
@@ -393,18 +378,17 @@ class Run:
         self.load_data()
         if self.state == 0:
             self.player.play('/sounds/eobuba.wav')
+        
+        print('data', self.kindergarden_id, self.wifi_ssid, self.wifi_password)
 
         self.start_led_timer()
         self.start_button_timer()
-        if self.state == 1:
-            self.is_setting = True
-            self.wifi_clear()
-            self.wifi_reset()
-            self.is_setting = False
-        else:
-            self.wifi_init()
+        print(self.state)
+        if self.state == 2:
+            self.player.play('/sounds/setting_mode.wav')
+        self.wifi_init()
 
-        if self.state == 0 or self.state == 1:
+        if self.state == 0:
             self.update()
         self.get_time()
         self.start_update_timer()
