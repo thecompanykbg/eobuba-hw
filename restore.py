@@ -12,15 +12,13 @@ from led import LED
 class Restore:
 
     def __init__(self):
-        self.ap_ssid = '\uc5b4\ubd80\ubc14 \uc124\uc815'
+        self.ap_ssid = 'TCS'
         self.ap_password = '12341234'
 
-        self.ble_led = LED(21)
-        self.wifi_led = LED(17)
+        self.led = LED(18, 19, 20)
 
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
         self.version = '0'
-        self.mode = 0     # 0: 와이파이  1: 블루투스
         self.error = 0
         self.state = 0    # 0: 정상  1: 와이파이 오류  2: 와이파이 재설정  3: 업데이트 완료
 
@@ -43,7 +41,6 @@ class Restore:
                 'ssid': '',
                 'password': '',
                 'version': '0',
-                'mode': 0,
                 'error': 1,
                 'state': 0
             }
@@ -55,7 +52,6 @@ class Restore:
         self.wifi_ssid = data.get('ssid', '')
         self.wifi_password = data.get('password', '')
         self.version = data.get('version', '0')
-        self.mode = data.get('mode', 0)
         self.error = data.get('error', 1)
         self.state = data.get('state', 0)
 
@@ -66,7 +62,6 @@ class Restore:
             'ssid': self.wifi_ssid,
             'password': self.wifi_password,
             'version': self.version,
-            'mode': self.mode,
             'error': self.error,
             'state': self.state
         }
@@ -140,11 +135,12 @@ class Restore:
     def wifi_setting(self):
         print(self.kindergarden_id, self.wifi_ssid, self.wifi_password)
         
-        if self.wifi_ssid != '':
+        if self.state != 2:
             return
-        
+
+        self.is_setting = True
         print('wifi setting..')
-        
+
         self.wlan.active(False)
         self.ap.config(essid=self.ap_ssid, password=self.ap_password)
         self.ap.ifconfig()
@@ -152,15 +148,19 @@ class Restore:
         sleep(0.5)
 
         network_list = []
-        for nw in self.wlan.scan():
-            network_list.append(bytes.decode(nw[0]))
+        try:
+            for nw in self.wlan.scan():
+                network_list.append(bytes.decode(nw[0]))
+        except Exception as e:
+            self.save_data('state', 1)
+            reset()
         
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(('', 80))
         s.listen(5)
 
-        while self.wifi_ssid == '':
+        while self.state == 2:
             conn, addr = s.accept()
             req = str(conn.recv(1024))
             response = self.web_login_page(network_list)
@@ -174,28 +174,15 @@ class Restore:
                 self.wifi_password = req[password_idx+10:end_idx]
                 print(self.kindergarden_id, self.wifi_ssid, self.wifi_password)
                 response = self.web_done_page()
+                self.save_data('state', 1)
             conn.send(response)
             conn.close()
         s.close()
         sleep(0.5)
 
-        self.save_data('group_id', self.kindergarden_id)
-        self.save_data('ssid', self.wifi_ssid)
-        self.save_data('password', self.wifi_password)
-
         self.ap.disconnect()
+        self.is_setting = False
         sleep(0.5)
-
-
-    def wifi_clear(self):
-        print('Wi-fi reset...')
-        self.wlan.disconnect()
-        self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
-
-
-    def wifi_reset(self):
-        self.save_data('state', 2)
-        reset()
 
 
     def wifi_connect(self):
@@ -203,16 +190,17 @@ class Restore:
         
         self.wlan.connect(self.wifi_ssid, self.wifi_password)
         count = 0
+        self.player.play('/sounds/connecting_wifi.wav')
         while self.wlan.isconnected() == False:
             if count >= 5:
-                print('Wi-fi connect fail')
-                return False
+                self.save_data('state', 1)
+                reset()
             print('Wi-fi connecting..')
             count += 1
             sleep(3)
         
         print('Wi-fi connect success')
-        self.start_wifi_time_timer()
+        self.player.play('/sounds/connected_wifi.wav')
         
         print(self.wlan.isconnected())
         print(self.wlan.ifconfig())
@@ -223,23 +211,14 @@ class Restore:
 
 
     def wifi_init(self):
-        self.wifi_setting(is_wrong=False)
+        self.wifi_setting()
         while not self.wifi_connect():
-            self.wifi_clear()
-            self.wifi_setting(is_wrong=True)
+            self.wifi_setting()
 
 
     def led_handler(self, timer):
-        if self.mode == 0:
-            if self.wlan.isconnected():
-                self.wifi_led.on()
-            else:
-                self.wifi_led.toggle()
-        else:
-            if self.ble_nfc.is_connected():
-                self.ble_led.on()
-            else:
-                self.ble_led.toggle()
+        self.led.set_rgb(255, 0, 0)
+        self.led.on()
 
 
     def start_led_timer(self):
@@ -252,9 +231,5 @@ class Restore:
         print('restore', self.error)
         
         if self.error != 0:
-            if self.state == 1:
-                self.wifi_clear()
-                self.wifi_reset()
-            else:
-                self.wifi_init()
-                self.update()
+            self.wifi_init()
+            self.update()

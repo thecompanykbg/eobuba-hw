@@ -29,6 +29,7 @@ class Run:
         self.button = Pin(13, Pin.IN, Pin.PULL_UP)
 
         self.is_setting = False
+        self.is_updating = False
 
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
         self.version = '0'
@@ -92,6 +93,8 @@ class Run:
 
 
     def update(self):
+        self.is_updating = True
+
         response = None
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
@@ -143,7 +146,10 @@ class Run:
 
 
     def led_handler(self, timer):
-        if self.state == 2:
+        if self.is_updating:
+            self.led.set_rgb(255, 0, 0)
+            self.led.on()
+        elif self.state == 2:
             self.led.set_rgb(255, 0, 0)
             self.led.toggle()
         else:
