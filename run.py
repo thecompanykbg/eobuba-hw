@@ -57,7 +57,6 @@ class Run:
                 'group_id': '',
                 'ssid': '',
                 'password': '',
-                'version': '0',
                 'error': 1,
                 'state': 0
             }
@@ -73,12 +72,25 @@ class Run:
         self.state = data.get('state', 0)
 
 
+    def load_version(self):
+        f = version = None
+        try:
+            f = open('version.txt', 'r')
+            version = eval(f.read())
+        except:
+            version = '0'
+            f = open('version.txt', 'w')
+            f.write(version)
+            f.close()
+
+        self.version = version
+
+
     def save_data(self, key, value):
         data = {
             'group_id': self.kindergarden_id,
             'ssid': self.wifi_ssid,
             'password': self.wifi_password,
-            'version': self.version,
             'error': self.error,
             'state': self.state
         }
@@ -92,8 +104,18 @@ class Run:
         self.load_data()
 
 
+    def save_version(self, new_version):
+        print('writing..')
+        f = open('version.txt', 'w')
+        f.write(str(new_version))
+        f.close()
+        print('done')
+        self.load_version()
+
+
     def update(self):
         self.is_updating = True
+        self.player.play('/sounds/updating.wav')
 
         response = None
         try:
@@ -134,7 +156,7 @@ class Run:
         
         self.save_data('error', 0)
         self.save_data('state', 3)
-        self.save_data('version', str(new_version))
+        self.save_version(new_version)
 
         print('Update complete.')
         sleep(1)

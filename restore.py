@@ -6,6 +6,7 @@ import socket
 import requests
 import json
 
+from max98357 import Player
 from led import LED
 
 
@@ -16,6 +17,8 @@ class Restore:
         self.ap_password = '12341234'
 
         self.led = LED(18, 19, 20)
+
+        self.player = Player()
 
         self.kindergarden_id = self.wifi_ssid = self.wifi_password = ''
         self.version = '0'
@@ -40,7 +43,6 @@ class Restore:
                 'group_id': '',
                 'ssid': '',
                 'password': '',
-                'version': '0',
                 'error': 1,
                 'state': 0
             }
@@ -56,12 +58,25 @@ class Restore:
         self.state = data.get('state', 0)
 
 
+    def load_version(self):
+        f = version = None
+        try:
+            f = open('version.txt', 'r')
+            version = eval(f.read())
+        except:
+            version = '0'
+            f = open('version.txt', 'w')
+            f.write(version)
+            f.close()
+
+        self.version = version
+
+
     def save_data(self, key, value):
         data = {
             'group_id': self.kindergarden_id,
             'ssid': self.wifi_ssid,
             'password': self.wifi_password,
-            'version': self.version,
             'error': self.error,
             'state': self.state
         }
@@ -75,21 +90,39 @@ class Restore:
         self.load_data()
 
 
+    def save_version(self, new_version):
+        print('writing..')
+        f = open('version.txt', 'w')
+        f.write(str(new_version))
+        f.close()
+        print('done')
+        self.load_version()
+
+
     def update(self):
+        self.player.play('/sounds/updating.wav')
+
+        response = None
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
         except Exception as e:
+            self.save_data('state', 1)
             reset()
         print(response.text, self.version)
         new_version = response.text
         response.close()
+        if new_version == self.version:
+            print(f'{self.version} is latest version.')
+            sleep(0.5)
+            return
 
         self.save_data('error', 1)
-        
+
         response = None
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
         except Exception as e:
+            self.save_data('state', 1)
             reset()
         file_names = response.text.split()
         response.close()
@@ -103,13 +136,15 @@ class Restore:
                 response.close()
                 f.close()
             except Exception as e:
+                self.save_data('state', 1)
                 reset()
         
         self.save_data('error', 0)
         self.save_data('state', 3)
-        self.save_data('version', str(new_version))
-        
+        self.save_version(new_version)
+
         print('Update complete.')
+        sleep(1)
         reset()
 
 
