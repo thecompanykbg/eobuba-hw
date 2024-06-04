@@ -93,7 +93,7 @@ class Restore:
     def save_version(self, new_version):
         print('writing..')
         f = open('version.txt', 'w')
-        f.write(str(new_version))
+        f.write(new_version)
         f.close()
         print('done')
         self.load_version()
