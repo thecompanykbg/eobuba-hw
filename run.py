@@ -159,6 +159,7 @@ class Run:
         self.save_version(new_version)
 
         print('Update complete.')
+        self.player.play('/sounds/restart.wav')
         sleep(1)
         reset()
 
