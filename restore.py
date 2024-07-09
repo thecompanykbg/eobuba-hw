@@ -93,6 +93,15 @@ class Restore:
 
         response = None
         try:
+            response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/version.txt')
+        except Exception as e:
+            self.save_data('state', 1)
+            reset()
+        new_version = response.text
+        response.close()
+
+        response = None
+        try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
         except Exception as e:
             self.save_data('state', 1)
