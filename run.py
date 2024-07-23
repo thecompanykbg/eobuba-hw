@@ -136,7 +136,7 @@ class Run:
         self.save_data('error', 1)
 
         self.player.play('/sounds/updating.wav')
-        
+
         response = None
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
@@ -189,7 +189,7 @@ class Run:
 
     def web_login_page(self, network_list):
         html = """<html><head><meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1"></head>
-                <body><h1>어부바 전자출결기기 Wi-fi 설정</h1>
+                <body><h2>어부바 전자출결기기 Wi-fi 설정</h2>
                 <form><label for="ssid">그룹 ID(GROUP_ID): <input id="groupId" name="groupId"><br></label>
                 <label for="ssid">와이파이 이름: <select id="ssid" name="ssid">"""
         html += ''.join([f'<option value="{network_name}">{network_name}</option>' for network_name in network_list])
