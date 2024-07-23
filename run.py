@@ -117,7 +117,6 @@ class Run:
 
     def update(self):
         self.is_updating = True
-        self.player.play('/sounds/updating.wav')
 
         response = None
         try:
@@ -136,6 +135,8 @@ class Run:
 
         self.save_data('error', 1)
 
+        self.player.play('/sounds/updating.wav')
+        
         response = None
         try:
             response = requests.get('http://raw.githubusercontent.com/thecompanykbg/eobuba-hw/main/files.txt')
