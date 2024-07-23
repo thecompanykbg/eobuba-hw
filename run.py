@@ -202,7 +202,7 @@ class Run:
 
     def web_done_page(self):
         html = """<html><head><meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1"></head>
-                <body><h1>설정 완료</h1></body></html>"""
+                <body><h2>Wi-fi 설정 완료</h2></body></html>"""
         return html
 
 
