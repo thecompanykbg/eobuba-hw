@@ -116,7 +116,6 @@ class Run:
 
 
     def update(self):
-        self.is_updating = True
 
         response = None
         try:
@@ -130,11 +129,11 @@ class Run:
         if new_version == self.version:
             print(f'{self.version} is latest version.')
             sleep(0.5)
-            self.is_updating = False
             return
 
         self.save_data('error', 1)
 
+        self.is_updating = True
         self.player.play('/sounds/updating.wav')
 
         response = None
@@ -348,7 +347,7 @@ class Run:
         elif result_code == 3:
             self.player.play('/sounds/leave.wav')
         else:
-            self.player.play('/sounds/card_already.wav')
+            self.player.play('/sounds/tag_already.wav')
 
 
     def button_handler(self, timer):
@@ -410,8 +409,6 @@ class Run:
     def run(self):
         self.load_data()
         self.load_version()
-        if self.state == 0:
-            self.player.play('/sounds/eobuba.wav')
         
         print('data', self.kindergarden_id, self.wifi_ssid, self.wifi_password)
 

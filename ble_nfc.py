@@ -170,7 +170,7 @@ class BLENFC:
             elif data == 3:
                 self.player.play('/sounds/leave.wav')
             elif data in [2, 4]:
-                self.player.play('/sounds/card_already.wav')
+                self.player.play('/sounds/tag_already.wav')
             elif data == -1:
                 self.player.play('/sounds/not_registered.wav')
         elif value_handle == self._handle_nfc_tag_id_ack:
