@@ -14,6 +14,7 @@ class LED:
         self.r = 0
         self.g = 0
         self.b = 0
+        self.volume = 16
         self.state = False
 
 
@@ -29,9 +30,9 @@ class LED:
     def on(self):
         if not self.state:
             for i in range(256):
-                self.led_r.duty_u16(self.r*i)
-                self.led_g.duty_u16(self.g*i)
-                self.led_b.duty_u16(self.b*i)
+                self.led_r.duty_u16(int(self.r*self.volume/256*i))
+                self.led_g.duty_u16(int(self.g*self.volume/256*i))
+                self.led_b.duty_u16(int(self.b*self.volume/256*i))
                 sleep(0.001)
             self.state = True
 
@@ -39,9 +40,9 @@ class LED:
     def off(self):
         if self.state:
             for i in range(255, -1, -1):
-                self.led_r.duty_u16(self.r*i)
-                self.led_g.duty_u16(self.g*i)
-                self.led_b.duty_u16(self.b*i)
+                self.led_r.duty_u16(int(self.r*self.volume/256*i))
+                self.led_g.duty_u16(int(self.g*self.volume/256*i))
+                self.led_b.duty_u16(int(self.b*self.volume/256*i))
                 sleep(0.001)
             self.state = False
 
@@ -58,7 +59,7 @@ class LED:
         self.led_g.duty_u16(0)
         self.led_b.duty_u16(0)
         sleep(0.1)
-        self.led_r.duty_u16(self.r*256)
-        self.led_g.duty_u16(self.g*256)
-        self.led_b.duty_u16(self.b*256)
+        self.led_r.duty_u16(self.r*self.volume)
+        self.led_g.duty_u16(self.g*self.volume)
+        self.led_b.duty_u16(self.b*self.volume)
         self.state = True
