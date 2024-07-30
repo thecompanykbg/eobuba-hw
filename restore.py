@@ -22,6 +22,7 @@ class Restore:
         self.version = '0'
         self.error = 0
         self.state = 0    # 0: 정상  1: 와이파이 오류  2: 와이파이 재설정  3: 업데이트 완료
+        self.speaker = True
 
         self.wlan = network.WLAN(network.STA_IF)
         self.ap = network.WLAN(network.AP_IF)
@@ -47,7 +48,8 @@ class Restore:
                 'ssid': '',
                 'password': '',
                 'error': 1,
-                'state': 0
+                'state': 0,
+                'speaker': True
             }
             f = open('data.txt', 'w')
             f.write(str(data))
@@ -58,6 +60,7 @@ class Restore:
         self.wifi_password = data.get('password', '')
         self.error = data.get('error', 1)
         self.state = data.get('state', 0)
+        self.speaker = data.get('speaker', True)
 
 
     def save_data(self, key, value):
@@ -66,7 +69,8 @@ class Restore:
             'ssid': self.wifi_ssid,
             'password': self.wifi_password,
             'error': self.error,
-            'state': self.state
+            'state': self.state,
+            'speaker': self.speaker
         }
         data[key] = value
         
@@ -87,7 +91,8 @@ class Restore:
 
 
     def update(self):
-        self.player.play('/sounds/updating.wav')
+        if self.speaker:
+            self.player.play('/sounds/updating.wav')
 
         self.save_data('error', 1)
 
@@ -126,19 +131,22 @@ class Restore:
         self.save_version(new_version)
 
         print('Update complete.')
-        self.player.play('/sounds/restart.wav')
+        if self.speaker:
+            self.player.play('/sounds/restart.wav')
         sleep(1)
         reset()
 
 
     def web_login_page(self, network_list):
         html = """<html><head><meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1"></head>
-                <body><h1>어부바 전자출결기기 Wi-fi 설정</h1>
+                <body><h2>어부바 전자출결기기 설정</h2>
                 <form><label for="ssid">그룹 ID(GROUP_ID): <input id="groupId" name="groupId"><br></label>
                 <label for="ssid">와이파이 이름: <select id="ssid" name="ssid">"""
         html += ''.join([f'<option value="{network_name}">{network_name}</option>' for network_name in network_list])
         html += """</select><br></label>
                 <label for="password">와이파이 비밀번호: <input id="password" name="password" type="password"></label><br>
+                <label for="speaker-on">스피커 ON <input id="speaker-on" name="speaker" type="radio" value="1"></label>
+                <label for="speaker-off">스피커 OFF <input id="speaker-off" name="speaker" type="radio" value="0"></label><br>
                 <input hidden name="end">
                 <input type="submit" value="확인"></form></body></html>"""
         return html
@@ -146,7 +154,7 @@ class Restore:
 
     def web_done_page(self):
         html = """<html><head><meta charset="utf-8" name="viewport" content="width=device-width, initial-scale=1"></head>
-                <body><h1>설정 완료</h1></body></html>"""
+                <body><h2>설정 완료</h2></body></html>"""
         return html
 
 
@@ -185,12 +193,14 @@ class Restore:
             group_id_idx = req.find('/?groupId=')
             ssid_idx = req.find('&ssid=')
             password_idx = req.find('&password=')
+            speaker_idx = req.find('&speaker=')
             end_idx = req.find('&end=')
             if ssid_idx >= 0:
                 self.kindergarden_id = req[group_id_idx+10:ssid_idx]
                 self.wifi_ssid = req[ssid_idx+6:password_idx]
-                self.wifi_password = req[password_idx+10:end_idx]
-                print(self.kindergarden_id, self.wifi_ssid, self.wifi_password)
+                self.wifi_password = req[password_idx+10:speaker_idx]
+                self.speaker = req[speaker_idx+9:end_idx] == '1'
+                print(self.kindergarden_id, self.wifi_ssid, self.wifi_password, self.speaker)
                 response = self.web_done_page()
                 self.save_data('state', 1)
             conn.send(response)
@@ -201,6 +211,7 @@ class Restore:
         self.ap.disconnect()
         self.is_setting = False
         sleep(0.5)
+        reset()
 
 
     def wifi_connect(self):
@@ -208,7 +219,8 @@ class Restore:
         
         self.wlan.connect(self.wifi_ssid, self.wifi_password)
         count = 0
-        self.player.play('/sounds/connecting_wifi.wav')
+        if self.speaker:
+            self.player.play('/sounds/connecting_wifi.wav')
         while self.wlan.isconnected() == False:
             if count >= 5:
                 self.save_data('state', 1)
@@ -218,7 +230,8 @@ class Restore:
             sleep(3)
         
         print('Wi-fi connect success')
-        self.player.play('/sounds/connected_wifi.wav')
+        if self.speaker:
+            self.player.play('/sounds/connected_wifi.wav')
         
         print(self.wlan.isconnected())
         print(self.wlan.ifconfig())
