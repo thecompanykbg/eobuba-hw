@@ -1,3 +1,5 @@
+# https://github.com/insighio/micropython-pn532-uart
+
 from micropython import const
 import machine
 import utime

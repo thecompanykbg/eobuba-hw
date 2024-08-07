@@ -1,3 +1,5 @@
+# https://github.com/stonedev-app/SimpleI2sSpeaker
+
 import wave
 from machine import I2S, Pin
 from time import sleep

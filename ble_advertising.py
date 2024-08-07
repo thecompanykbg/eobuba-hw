@@ -1,3 +1,5 @@
+# https://github.com/micropython/micropython/blob/master/examples/bluetooth/ble_advertising.py
+
 # Helpers for generating BLE advertising payloads.
 
 from micropython import const

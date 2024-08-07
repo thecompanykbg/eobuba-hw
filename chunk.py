@@ -1,3 +1,5 @@
+# https://github.com/stonedev-app/SimpleI2sSpeaker
+
 """Simple class to read IFF chunks.
 
 An IFF chunk (used in formats such as AIFF, TIFF, RMFF (RealMedia File

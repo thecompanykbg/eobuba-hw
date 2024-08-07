@@ -1,3 +1,5 @@
+# https://github.com/micropython/micropython/blob/master/examples/bluetooth/ble_simple_peripheral.py
+
 # This example demonstrates a UART periperhal.
 
 # This example demonstrates the low-level bluetooth module. For most
